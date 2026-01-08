@@ -344,7 +344,6 @@ export  function DatabricksMigrationWorkspace({ onLogout, onBack, onMigrationCom
     const selectedDetails = getSelectedItemDetails();
     return (
       <div className="min-h-screen bg-background">
-        <AppHeader onLogout={onLogout} />
         <main className="p-6 max-w-4xl mx-auto animate-fade-in">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
             <button onClick={() => setShowReview(false)} className="hover:text-foreground">
@@ -610,7 +609,6 @@ export  function DatabricksMigrationWorkspace({ onLogout, onBack, onMigrationCom
       </aside>
 
       <div className="flex-1">
-        <AppHeader onLogout={onLogout} />
 
         <main className="p-6 animate-fade-in">
           {/* Breadcrumb */}

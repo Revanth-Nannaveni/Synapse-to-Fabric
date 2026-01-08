@@ -19,14 +19,15 @@ interface MigrationSidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   onBack: () => void;
+  workspaceName: string; // Added this prop
 }
 
 const menuItems = [
-  { id: "overview", label: "Overview", icon: LayoutGrid },
+  // { id: "overview", label: "Overview", icon: LayoutGrid },
   { id: "inventory", label: "Inventory", icon: Layers, active: true },
-  { id: "migrationPlan", label: "Migration Plan", icon: FileBarChart },
-  { id: "monitor", label: "Monitor", icon: Monitor },
-  { id: "settings", label: "Settings", icon: Settings },
+  // { id: "migrationPlan", label: "Migration Plan", icon: FileBarChart },
+  // { id: "monitor", label: "Monitor", icon: Monitor },
+  // { id: "settings", label: "Settings", icon: Settings },
 ];
 
 const inventoryItems = [
@@ -36,18 +37,18 @@ const inventoryItems = [
   { id: "linkedServices", label: "Linked Services", icon: Link2 },
 ];
 
-export function MigrationSidebar({ activeTab, onTabChange, onBack }: MigrationSidebarProps) {
+export function MigrationSidebar({ activeTab, onTabChange, onBack, workspaceName }: MigrationSidebarProps) {
   return (
     <aside className="w-64 min-h-screen bg-sidebar border-r flex flex-col">
       {/* Logo */}
-      <div className="p-4 border-b">
+      {/* <div className="p-4 border-b">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
             <Database className="w-5 h-5 text-sidebar-primary-foreground" />
           </div>
           <span className="font-semibold text-sidebar-foreground">MigratePro</span>
         </div>
-      </div>
+      </div> */}
 
       {/* Workspace Selector */}
       <div className="p-4 border-b">
@@ -61,12 +62,17 @@ export function MigrationSidebar({ activeTab, onTabChange, onBack }: MigrationSi
         <div className="flex items-center gap-3 p-2 rounded-lg bg-sidebar-accent">
           <Avatar className="w-8 h-8">
             <AvatarFallback className="bg-primary/20 text-primary text-xs">
-              SW
+              {workspaceName
+                .split(' ')
+                .map(word => word[0])
+                .join('')
+                .toUpperCase()
+                .slice(0, 2) || 'SW'}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-sidebar-foreground truncate">
-              Synapse Works...
+              {workspaceName}
             </p>
             <p className="text-xs text-muted-foreground">Admin Access</p>
           </div>
@@ -74,7 +80,7 @@ export function MigrationSidebar({ activeTab, onTabChange, onBack }: MigrationSi
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-3">
+      <nav className="flex-1 p-3 pt-16">
         <ul className="space-y-1">
           {menuItems.map((item) => (
             <li key={item.id}>
@@ -117,13 +123,6 @@ export function MigrationSidebar({ activeTab, onTabChange, onBack }: MigrationSi
         </ul>
       </nav>
 
-      {/* Footer */}
-      <div className="p-4 border-t">
-        <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground w-full">
-          <LogOut className="w-4 h-4" />
-          Sign Out
-        </button>
-      </div>
     </aside>
   );
 }

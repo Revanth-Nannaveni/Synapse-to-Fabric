@@ -70,32 +70,10 @@ export function MigrationReport({
   // Get the appropriate types based on source
   const assetTypes = source === "databricks" ? databricksTypes : synapseTypes;
 
-  // Simulate migration progress
+  // Update items when props change (for live updates from parent)
 useEffect(() => {
-  const runningItems = items.filter(item => item.status === "Running");
-  if (runningItems.length === 0) return;
-
-  const timer = setTimeout(() => {
-    setItems(prev =>
-      prev.map(item => {
-        if (item.status === "Running") {
-          const success = Math.random() > 0.2;
-          return {
-            ...item, // ✅ keep full MigrationItem
-            status: success ? "Success" : "Failed",
-            errorMessage: success
-              ? undefined
-              : "Connection timeout during data transfer",
-          };
-        }
-        return item;
-      })
-    );
-  }, 3000);
-
-  return () => clearTimeout(timer);
-}, [items]);
-
+  setItems(initialItems);
+}, [initialItems]);
 
   const stats = {
     total: items.length,
@@ -115,24 +93,81 @@ useEffect(() => {
     return matchesStatus && matchesType && matchesSearch;
   });
 
- const retryFailed = () => {
-  setItems(prev =>
-    prev.map(item =>
-      item.status === "Failed"
-        ? {
-            ...item, 
-            status: "Running",
-            errorMessage: undefined,
-          }
-        : item
-    )
-  );
+//  const retryFailed = () => {
+//   setItems(prev =>
+//     prev.map(item =>
+//       item.status === "Failed"
+//         ? {
+//             ...item, 
+//             status: "Running",
+//             errorMessage: undefined,
+//           }
+//         : item
+//     )
+//   );
+// };
+
+const exportReportAsJson = () => {
+  // Create the report structure
+  const report = {
+    metadata: {
+      exportDate: new Date().toISOString(),
+      exportedBy: "Migration Tool",
+      source: source === "databricks" ? "Databricks" : "Azure Synapse",
+      target: "Microsoft Fabric",
+      version: "3.1.0"
+    },
+    summary: {
+      totalItems: stats.total,
+      successful: stats.success,
+      running: stats.running,
+      failed: stats.failed,
+      successRate: stats.total > 0 ? ((stats.success / stats.total) * 100).toFixed(2) + "%" : "0%"
+    },
+    items: items.map(item => ({
+      id: item.id,
+      name: item.name,
+      type: item.type,
+      status: item.status,
+      targetWorkspace: item.targetWorkspace || "N/A",
+      lastModified: item.lastModified,
+      errorMessage: item.errorMessage || null,
+      // Include any additional properties
+      ...(item.runtimeVersion && { runtimeVersion: item.runtimeVersion }),
+      ...(item.nodeType && { nodeType: item.nodeType }),
+      ...(item.nodes && { nodes: item.nodes }),
+      ...(item.language && { language: item.language }),
+      ...(item.dependencies && { dependencies: item.dependencies }),
+      ...(item.activities && { activities: item.activities })
+    }))
+  };
+
+  // Convert to JSON string with pretty formatting
+  const jsonString = JSON.stringify(report, null, 2);
+
+  // Create a Blob from the JSON string
+  const blob = new Blob([jsonString], { type: 'application/json' });
+
+  // Create a download link
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  
+  // Generate filename with timestamp
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+  link.download = `migration-report-${timestamp}.json`;
+
+  // Trigger download
+  document.body.appendChild(link);
+  link.click();
+
+  // Cleanup
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 };
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader onLogout={onLogout} />
-
       <main className="p-6 max-w-7xl mx-auto animate-fade-in">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
@@ -155,11 +190,11 @@ useEffect(() => {
             </p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" onClick={retryFailed} disabled={stats.failed === 0}>
+            {/* <Button variant="outline" onClick={retryFailed} disabled={stats.failed === 0}>
               <RefreshCw className="w-4 h-4" />
               Retry Failed
-            </Button>
-            <Button variant="outline">
+            </Button> */}
+           <Button variant="outline" onClick={exportReportAsJson}>
               <Download className="w-4 h-4" />
               Export Report
             </Button>

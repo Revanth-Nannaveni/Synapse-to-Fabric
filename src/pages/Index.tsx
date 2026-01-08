@@ -6,6 +6,7 @@ import { DatabricksMigrationWorkspace } from "./DatabricksMigrationWorkspace";
 import { MigrationReport } from "./MigrationReport";
 import { ConnectSynapseModal } from "@/components/modals/ConnectSynapseModal";
 import { ConnectDatabricksModal } from "@/components/modals/ConnectDatabricksModal";
+import { getMsalUser } from "@/auth/msalUser";
 import type { MigrationItem, SynapseConnection } from "@/types/migration";
 
 type AppView = 
@@ -16,7 +17,8 @@ type AppView =
 
 const Index = () => {
   const { instance } = useMsal();
-  const [currentView, setCurrentView] = useState<AppView>("home"); // Start at home, not login
+  const user = getMsalUser(instance);
+  const [currentView, setCurrentView] = useState<AppView>("home");
   const [showSynapseModal, setShowSynapseModal] = useState(false);
   const [showDatabricksModal, setShowDatabricksModal] = useState(false);
   const [migrationItems, setMigrationItems] = useState<MigrationItem[]>([]);
@@ -49,11 +51,22 @@ const Index = () => {
     setCurrentView("databricks-workspace");
   };
 
-  const handleMigrationComplete = (items: MigrationItem[], source: "synapse" | "databricks") => {
+ const handleMigrationComplete = (
+  items: MigrationItem[] | ((prev: MigrationItem[]) => MigrationItem[]), 
+  source?: "synapse" | "databricks"
+) => {
+  if (typeof items === 'function') {
+    // This is an update callback - just update the state
     setMigrationItems(items);
-    setMigrationSource(source);
+  } else {
+    // This is initial items - navigate to report and set source
+    setMigrationItems(items);
+    if (source) {
+      setMigrationSource(source);
+    }
     setCurrentView("migration-report");
-  };
+  }
+};
 
   const handleBackToHome = () => {
     setCurrentView("home");
@@ -67,6 +80,7 @@ const Index = () => {
           onLogout={handleLogout}
           onMigrateFromSynapse={handleMigrateFromSynapse}
           onMigrateFromDatabricks={handleMigrateFromDatabricks}
+          userName={user?.name || user?.firstName || "User"}
         />
       )}
 
@@ -75,8 +89,9 @@ const Index = () => {
           onLogout={handleLogout}
           onBack={handleBackToHome}
           onMigrationComplete={(items) => handleMigrationComplete(items, "synapse")}
+          onMigrationUpdate={(updateFn) => handleMigrationComplete(updateFn)}
           apiResponse={synapseApiResponse}
-        />
+          />
       )}
 
       {currentView === "databricks-workspace" && (
