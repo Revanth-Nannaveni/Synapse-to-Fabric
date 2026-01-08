@@ -1,96 +1,14 @@
-// export type Status = 'Success' | 'Running' | 'Failed' | 'Ready' | 'Deprecated' | 'Pending';
-
-// export interface FabricJob {
-//   id: string;
-//   name: string;
-//   type: string;
-//   workspace: string;
-//   lastModified: string;
-//   status: Status;
-//   description?: string;
-// }
-
-// export interface Workflow {
-//   id: string;
-//   name: string;
-//   type: string;
-//   lastModified: string;
-//   status: Status;
-// }
-
-// export interface SparkPool {
-//   id: string;
-//   name: string;
-//   runtimeVersion: string;
-//   nodeType: string;
-//   nodes: number;
-//   libraries: string;
-//   status: Status;
-// }
-
-// export interface Notebook {
-//   id: string;
-//   name: string;
-//   language: string;
-//   lastModified: string;
-//   dependencies: number;
-//   status: Status;
-// }
-
-// export interface Pipeline {
-//   id: string;
-//   name: string;
-//   activities: number;
-//   lastRun: string;
-//   status: Status;
-// }
-
-// export interface LinkedService {
-//   id: string;
-//   name: string;
-//   type: string;
-//   status: Status;
-// }
-
-// export interface SynapseConnection {
-//   tenantId: string;
-//   clientId: string;
-//   clientSecret: string;
-//   subscriptionId: string;
-//   resourceGroup: string;
-//   workspaceName: string;
-//   discoveryScope: {
-//     sparkPools: boolean;
-//     notebooks: boolean;
-//     pipelines: boolean;
-//     linkedServices: boolean;
-//   };
-// }
-
-// export interface FabricConnection {
-//   tenantId: string;
-//   clientId: string;
-//   clientSecret: string;
-//   subscriptionId?: string;
-// }
-
-// export interface MigrationItem {
-//   id: string;
-//   name: string;
-//   type: 'Workflow' | 'Job' | 'SparkPool' | 'Notebook' | 'Pipeline' | 'LinkedService';
-//   targetWorkspace?: string;
-//   status: Status;
-//   lastModified: string;
-//   errorMessage?: string;
-// }
-
-// export interface Workspace {
-//   id: string;
-//   name: string;
-//   capacity: string;
-//   region: string;
-// }
-export type Status = 'Success' | 'Running' | 'Failed' | 'Ready' | 'Deprecated' | 'Pending';
+export type Status =
+  | 'Success'
+  | 'Running'
+  | 'Failed'
+  | 'Ready'
+  | 'Deprecated'
+  | 'Pending'
+  | 'Queued'
+  | 'Cancelled'
+  | 'Skipped'
+  | 'Unknown';
 
 export interface FabricJob {
   id: string;
@@ -149,8 +67,8 @@ export interface SynapseConnection {
   tenantId: string;
   clientId: string;
   clientSecret: string;
-  subscriptionId: string;
-  resourceGroup: string;
+  subscriptionId?: string; // optional
+  resourceGroup?: string;  // optional
   workspaceName: string;
   discoveryScope: {
     sparkPools: boolean;
@@ -159,6 +77,7 @@ export interface SynapseConnection {
     linkedServices: boolean;
   };
 }
+
 
 export interface FabricConnection {
   tenantId: string;
@@ -175,6 +94,14 @@ export interface MigrationItem {
   status: Status;
   lastModified: string;
   errorMessage?: string;
+
+  //optional
+  runtimeVersion?: string;
+  nodeType?: string;
+  nodes?: number;
+  language?: string;
+  dependencies?: number;
+  activities?: number;
 }
 
 export interface Workspace {

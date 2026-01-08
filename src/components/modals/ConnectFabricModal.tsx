@@ -66,11 +66,14 @@ export function ConnectFabricModal({ open, onClose, onConnect }: ConnectFabricMo
         }
       );
 
+      console.log(response)
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log("API response data:", data);
       
       toast({
         title: "Connected Successfully",

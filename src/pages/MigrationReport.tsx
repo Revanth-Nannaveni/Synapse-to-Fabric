@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -38,21 +39,21 @@ interface MigrationReportProps {
   items: MigrationItem[];
   onLogout: () => void;
   onBackToHome: () => void;
-  source?: "synapse" | "databricks"; // New prop to determine source
+  source?: "synapse" | "databricks";
 }
 
 export function MigrationReport({ 
   items: initialItems, 
   onLogout, 
   onBackToHome,
-  source = "synapse" // Default to synapse
+  source = "synapse"
 }: MigrationReportProps) {
   const [items, setItems] = useState<MigrationItem[]>(initialItems);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
-  // Define asset types based on source
   const synapseTypes = [
     { value: "SparkPool", label: "Spark Pool" },
     { value: "Notebook", label: "Notebook" },
@@ -67,13 +68,11 @@ export function MigrationReport({
     { value: "DLT", label: "Delta Live Table" },
   ];
 
-  // Get the appropriate types based on source
   const assetTypes = source === "databricks" ? databricksTypes : synapseTypes;
 
-  // Update items when props change (for live updates from parent)
-useEffect(() => {
-  setItems(initialItems);
-}, [initialItems]);
+  useEffect(() => {
+    setItems(initialItems);
+  }, [initialItems]);
 
   const stats = {
     total: items.length,
@@ -82,6 +81,7 @@ useEffect(() => {
     failed: items.filter((i: { status: string; }) => i.status === "Failed").length,
   };
 
+  const hasRunningItems = stats.running > 0;
   const progress = stats.total > 0 ? ((stats.success + stats.failed) / stats.total) * 100 : 0;
 
   const filteredItems = items.filter((item: { status: any; type: any; name: string; }) => {
@@ -93,83 +93,88 @@ useEffect(() => {
     return matchesStatus && matchesType && matchesSearch;
   });
 
-//  const retryFailed = () => {
-//   setItems(prev =>
-//     prev.map(item =>
-//       item.status === "Failed"
-//         ? {
-//             ...item, 
-//             status: "Running",
-//             errorMessage: undefined,
-//           }
-//         : item
-//     )
-//   );
-// };
-
-const exportReportAsJson = () => {
-  // Create the report structure
-  const report = {
-    metadata: {
-      exportDate: new Date().toISOString(),
-      exportedBy: "Migration Tool",
-      source: source === "databricks" ? "Databricks" : "Azure Synapse",
-      target: "Microsoft Fabric",
-      version: "3.1.0"
-    },
-    summary: {
-      totalItems: stats.total,
-      successful: stats.success,
-      running: stats.running,
-      failed: stats.failed,
-      successRate: stats.total > 0 ? ((stats.success / stats.total) * 100).toFixed(2) + "%" : "0%"
-    },
-    items: items.map(item => ({
-      id: item.id,
-      name: item.name,
-      type: item.type,
-      status: item.status,
-      targetWorkspace: item.targetWorkspace || "N/A",
-      lastModified: item.lastModified,
-      errorMessage: item.errorMessage || null,
-      // Include any additional properties
-      ...(item.runtimeVersion && { runtimeVersion: item.runtimeVersion }),
-      ...(item.nodeType && { nodeType: item.nodeType }),
-      ...(item.nodes && { nodes: item.nodes }),
-      ...(item.language && { language: item.language }),
-      ...(item.dependencies && { dependencies: item.dependencies }),
-      ...(item.activities && { activities: item.activities })
-    }))
+  const toggleItemSelection = (itemId: string) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
   };
 
-  // Convert to JSON string with pretty formatting
-  const jsonString = JSON.stringify(report, null, 2);
+  const toggleAllItems = () => {
+    if (selectedItems.size === filteredItems.length) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(filteredItems.map(item => item.id)));
+    }
+  };
 
-  // Create a Blob from the JSON string
-  const blob = new Blob([jsonString], { type: 'application/json' });
+  const allFilteredSelected = filteredItems.length > 0 && selectedItems.size === filteredItems.length;
 
-  // Create a download link
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  
-  // Generate filename with timestamp
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-  link.download = `migration-report-${timestamp}.json`;
+  const exportReportAsJson = () => {
+    const itemsToExport = selectedItems.size > 0 
+      ? items.filter(item => selectedItems.has(item.id))
+      : items;
 
-  // Trigger download
-  document.body.appendChild(link);
-  link.click();
+    const report = {
+      metadata: {
+        exportDate: new Date().toISOString(),
+        exportedBy: "Migration Tool",
+        source: source === "databricks" ? "Databricks" : "Azure Synapse",
+        target: "Microsoft Fabric",
+        version: "3.1.0",
+        itemsExported: itemsToExport.length,
+        selectedItemsOnly: selectedItems.size > 0
+      },
+      summary: {
+        totalItems: itemsToExport.length,
+        successful: itemsToExport.filter(i => i.status === "Success").length,
+        running: itemsToExport.filter(i => i.status === "Running").length,
+        failed: itemsToExport.filter(i => i.status === "Failed").length,
+        successRate: itemsToExport.length > 0 
+          ? ((itemsToExport.filter(i => i.status === "Success").length / itemsToExport.length) * 100).toFixed(2) + "%" 
+          : "0%"
+      },
+      items: itemsToExport.map(item => ({
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        status: item.status,
+        targetWorkspace: item.targetWorkspace || "N/A",
+        lastModified: item.lastModified,
+        errorMessage: item.errorMessage || null,
+        ...(item.runtimeVersion && { runtimeVersion: item.runtimeVersion }),
+        ...(item.nodeType && { nodeType: item.nodeType }),
+        ...(item.nodes && { nodes: item.nodes }),
+        ...(item.language && { language: item.language }),
+        ...(item.dependencies && { dependencies: item.dependencies }),
+        ...(item.activities && { activities: item.activities })
+      }))
+    };
 
-  // Cleanup
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-};
+    const jsonString = JSON.stringify(report, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const selectionSuffix = selectedItems.size > 0 ? '-selected' : '';
+    link.download = `migration-report${selectionSuffix}-${timestamp}.json`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="min-h-screen bg-background">
       <main className="p-6 max-w-7xl mx-auto animate-fade-in">
-        {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
           <button onClick={onBackToHome} className="hover:text-foreground flex items-center gap-1">
             <Home className="w-4 h-4" />
@@ -181,7 +186,6 @@ const exportReportAsJson = () => {
           </span>
         </div>
 
-        {/* Header */}
         <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-foreground mb-1">Migration Report</h1>
@@ -190,13 +194,14 @@ const exportReportAsJson = () => {
             </p>
           </div>
           <div className="flex gap-3">
-            {/* <Button variant="outline" onClick={retryFailed} disabled={stats.failed === 0}>
-              <RefreshCw className="w-4 h-4" />
-              Retry Failed
-            </Button> */}
-           <Button variant="outline" onClick={exportReportAsJson}>
+            <Button 
+              variant="outline" 
+              onClick={exportReportAsJson}
+              disabled={hasRunningItems}
+              title={hasRunningItems ? "Wait for all items to complete before exporting" : "Export migration report"}
+            >
               <Download className="w-4 h-4" />
-              Export Report
+              Export Report {selectedItems.size > 0 && `(${selectedItems.size})`}
             </Button>
             <Button variant="azure" onClick={onBackToHome}>
               <Home className="w-4 h-4" />
@@ -205,7 +210,6 @@ const exportReportAsJson = () => {
           </div>
         </div>
 
-        {/* Overall Progress */}
         <Card className="mb-6">
           <CardContent className="py-5">
             <div className="flex items-center justify-between mb-3">
@@ -238,7 +242,6 @@ const exportReportAsJson = () => {
           </CardContent>
         </Card>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-4 gap-4 mb-6">
           <Card className="p-4">
             <div className="flex items-center justify-between">
@@ -286,7 +289,6 @@ const exportReportAsJson = () => {
           </Card>
         </div>
 
-        {/* Filters */}
         <div className="flex items-center gap-3 mb-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -324,11 +326,17 @@ const exportReportAsJson = () => {
           </Select>
         </div>
 
-        {/* Migration Table */}
         <Card>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[50px]">
+                  <Checkbox
+                    checked={allFilteredSelected}
+                    onCheckedChange={toggleAllItems}
+                    aria-label="Select all items"
+                  />
+                </TableHead>
                 <TableHead className="w-[250px]">ITEM NAME</TableHead>
                 <TableHead>TYPE</TableHead>
                 <TableHead>TARGET WORKSPACE</TableHead>
@@ -338,42 +346,43 @@ const exportReportAsJson = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-          {filteredItems.map((item) => (
-            <TableRow key={item.id} className="hover:bg-muted/50">
-              <TableCell className="font-medium">{item.name}</TableCell>
-
-              <TableCell>
-                <span className="px-2 py-1 rounded bg-muted text-xs">
-                  {assetTypes.find(t => t.value === item.type)?.label ?? item.type}
-                </span>
-              </TableCell>
-
-              <TableCell className="text-muted-foreground">
-                {item.targetWorkspace ?? "-"}
-              </TableCell>
-
-              <TableCell>
-                <StatusBadge status={item.status} />
-              </TableCell>
-
-              <TableCell className="text-muted-foreground">
-                {item.lastModified}
-              </TableCell>
-
-              <TableCell>
-                {item.errorMessage ? (
-                  <div className="flex items-center gap-2 text-destructive text-sm">
-                    <AlertTriangle className="w-4 h-4" />
-                    {item.errorMessage}
-                  </div>
-                ) : (
-                  <span className="text-muted-foreground">-</span>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-
+              {filteredItems.map((item) => (
+                <TableRow key={item.id} className="hover:bg-muted/50">
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedItems.has(item.id)}
+                      onCheckedChange={() => toggleItemSelection(item.id)}
+                      aria-label={`Select ${item.name}`}
+                    />
+                  </TableCell>
+                  <TableCell className="font-medium">{item.name}</TableCell>
+                  <TableCell>
+                    <span className="px-2 py-1 rounded bg-muted text-xs">
+                      {assetTypes.find(t => t.value === item.type)?.label ?? item.type}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {item.targetWorkspace ?? "-"}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={item.status} />
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {item.lastModified}
+                  </TableCell>
+                  <TableCell>
+                    {item.errorMessage ? (
+                      <div className="flex items-center gap-2 text-destructive text-sm">
+                        <AlertTriangle className="w-4 h-4" />
+                        {item.errorMessage}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
           </Table>
         </Card>
 

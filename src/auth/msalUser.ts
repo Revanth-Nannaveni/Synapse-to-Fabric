@@ -1,6 +1,6 @@
-import { PublicClientApplication } from "@azure/msal-browser";
+import { IPublicClientApplication, PublicClientApplication } from "@azure/msal-browser";
 
-export const getMsalUser = (instance: PublicClientApplication) => {
+export const getMsalUser = (instance: IPublicClientApplication) => {
   const account =
     instance.getActiveAccount() || instance.getAllAccounts()[0];
 

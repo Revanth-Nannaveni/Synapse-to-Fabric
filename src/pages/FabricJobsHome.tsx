@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,6 +25,8 @@ import {
   FolderOpen,
   ChevronLeft,
   ChevronRight,
+  Icon,
+  Cpu,
 } from "lucide-react";
 import {
   Select,
@@ -49,24 +51,27 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import type { FabricJob, FabricApiResponse, Workspace } from "@/types/migration";
+import DetailModal from "../components/modals/DetailModal";
+import type { FabricWorkspace } from "@/types/migration";
 
 interface FabricJobsHomeProps {
   onLogout: () => void;
   onMigrateFromSynapse: () => void;
   onMigrateFromDatabricks: () => void;
-  userName?: string; // Add userName prop
+  userName?: string;
 }
 
 export function FabricJobsHome({
   onLogout,
   onMigrateFromSynapse,
   onMigrateFromDatabricks,
-  userName = "User", // Default fallback
+  userName = "User",
 }: FabricJobsHomeProps) {
   const [showFabricModal, setShowFabricModal] = useState(false);
   const [isFabricConnected, setIsFabricConnected] = useState(false);
   const [jobs, setJobs] = useState<FabricJob[]>([]);
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [workspaces, setWorkspaces] = useState<FabricWorkspace[]>([]);
+  const [apiResponse, setApiResponse] = useState<FabricApiResponse | null>(null); // Store original API response
   const [selectedWorkspace, setSelectedWorkspace] = useState<string>("all");
   
   // Filter states
@@ -77,6 +82,8 @@ export function FabricJobsHome({
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
+
+  const [selectedItem, setSelectedItem] = useState(null);
 
   // Transform API response to job format
   const transformApiResponseToJobs = (apiData: FabricApiResponse): FabricJob[] => {
@@ -142,6 +149,20 @@ export function FabricJobsHome({
           workspaceId: model.workspaceId,
         });
       });
+
+      // Process Spark Pools - Create unique IDs to avoid collisions
+      workspace.sparkPools.forEach((pool) => {
+        const uniqueId = `${workspace.workspaceId}-${pool.id}`;
+        transformedJobs.push({
+          id: uniqueId,
+          name: pool.name,
+          type: "Spark Pool",
+          workspace: workspace.workspaceName,
+          lastModified: "N/A",
+          status: "Success",
+          workspaceId: workspace.workspaceId,
+        });
+      });
     });
 
     return transformedJobs;
@@ -149,14 +170,48 @@ export function FabricJobsHome({
 
   const handleConnectFabric = (apiResponse: FabricApiResponse) => {
     setIsFabricConnected(true);
+    setApiResponse(apiResponse); // Store original API response
     setWorkspaces(apiResponse.workspaces);
     const transformedJobs = transformApiResponseToJobs(apiResponse);
     setJobs(transformedJobs);
     setShowFabricModal(false);
   };
 
+  // Helper function to get original item data from API response
+  const getOriginalItemData = (job: FabricJob) => {
+    if (!apiResponse) return job;
+
+    // Find the workspace
+    const workspace = apiResponse.workspaces.find(
+      ws => ws.workspaceId === job.workspaceId
+    );
+
+    if (!workspace) return job;
+
+    // Based on job type, find the original item
+    switch (job.type) {
+      case "Notebook":
+        return workspace.notebooks.find(item => item.id === job.id) || job;
+      case "Pipeline":
+        return workspace.pipelines.find(item => item.id === job.id) || job;
+      case "Lakehouse":
+        return workspace.lakehouses.find(item => item.id === job.id) || job;
+      case "Warehouse":
+        return workspace.warehouses.find(item => item.id === job.id) || job;
+      case "Semantic Model":
+        return workspace.semanticModels.find(item => item.id === job.id) || job;
+      case "Spark Pool":
+        // For Spark Pool, we need to extract the original ID from our composite ID
+        const originalId = job.id.split('-').slice(5).join('-'); // Remove workspace ID prefix
+        return workspace.sparkPools.find(item => item.id === originalId) || job;
+      default:
+        return job;
+    }
+  };
+
+  // FIXED: Simplified function - no bullet splitting needed
   const getJobType = (typeString: string) => {
-    return typeString.split("•")[0].trim();
+    return typeString;
   };
 
   const workspaceFilteredJobs = useMemo(() => {
@@ -167,15 +222,14 @@ export function FabricJobsHome({
   }, [jobs, selectedWorkspace]);
 
   const uniqueTypes = useMemo(() => {
-    const types = new Set(workspaceFilteredJobs.map(job => getJobType(job.type)));
+    const types = new Set(workspaceFilteredJobs.map(job => job.type));
     return Array.from(types);
   }, [workspaceFilteredJobs]);
 
   const typeCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     workspaceFilteredJobs.forEach(job => {
-      const type = getJobType(job.type);
-      counts[type] = (counts[type] || 0) + 1;
+      counts[job.type] = (counts[job.type] || 0) + 1;
     });
     return counts;
   }, [workspaceFilteredJobs]);
@@ -193,6 +247,8 @@ export function FabricJobsHome({
         return Database;
       case 'semantic model':
         return Database;
+      case 'spark pool':  
+        return Cpu;  
       default:
         return FolderOpen;
     }
@@ -203,7 +259,7 @@ export function FabricJobsHome({
       const matchesSearch = job.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            job.type.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === "all" || job.status === statusFilter;
-      const matchesType = typeFilter === "all" || getJobType(job.type) === typeFilter;
+      const matchesType = typeFilter === "all" || job.type === typeFilter;
       
       return matchesSearch && matchesStatus && matchesType;
     });
@@ -216,7 +272,7 @@ export function FabricJobsHome({
   const paginatedJobs = filteredJobs.slice(startIndex, endIndex);
 
   // Reset to page 1 when filters change
-  useMemo(() => {
+  useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, statusFilter, typeFilter, selectedWorkspace]);
 
@@ -242,10 +298,6 @@ export function FabricJobsHome({
               <User className="w-4 h-4" />
               Owner: {userName}
             </span>
-            <span className="flex items-center gap-1.5">
-              <Calendar className="w-4 h-4" />
-              Created: Oct 24, 2023
-            </span>
             <span className="px-2 py-0.5 rounded-full bg-success/10 text-success text-xs font-medium">
               ● Active
             </span>
@@ -270,7 +322,7 @@ export function FabricJobsHome({
                   variant="azure-outline"
                   onClick={() => setShowFabricModal(true)}
                 >
-                  <Sparkles className="w-4 h-4" />
+                  <Cpu className="w-4 h-4" />
                   Connect to Fabric
                 </Button>
               )}
@@ -319,7 +371,8 @@ export function FabricJobsHome({
 
             {/* Type Count Tiles */}
             {isFabricConnected && Object.keys(typeCounts).length > 0 && (
-              <div className="grid grid-cols-5 gap-3 mb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+                {/* All Items Card */}
                 <Card 
                   className="cursor-pointer hover:bg-accent/50 transition-colors"
                   onClick={() => setTypeFilter("all")}
@@ -341,7 +394,8 @@ export function FabricJobsHome({
                   </CardContent>
                 </Card>
 
-                {Object.entries(typeCounts).slice(0, 4).map(([type, count]) => {
+                {/* Individual Type Cards */}
+                {Object.entries(typeCounts).map(([type, count]) => {
                   const Icon = getTypeIcon(type);
                   return (
                     <Card 
@@ -353,7 +407,7 @@ export function FabricJobsHome({
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-2xl font-bold">{count}</p>
-                            <p className="text-xs text-muted-foreground mt-1">{type}</p>
+                            <p className="text-xs text-muted-foreground mt-1 truncate">{type}</p>
                           </div>
                           <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                             typeFilter === type ? 'bg-primary/20' : 'bg-muted'
@@ -369,7 +423,6 @@ export function FabricJobsHome({
                 })}
               </div>
             )}
-
             {/* Search and Filters */}
             {isFabricConnected && (
               <div className="flex items-center gap-2">
@@ -484,14 +537,14 @@ export function FabricJobsHome({
                                   {job.name}
                                 </p>
                                 <p className="text-[11px] text-muted-foreground">
-                                  {job.type.split("•")[1]?.trim() || ""}
+                                  {job.workspace}
                                 </p>
                               </div>
                             </div>
                           </TableCell>
 
                           <TableCell className="text-xs font-medium">
-                            {getJobType(job.type)}
+                            {job.type}
                           </TableCell>
 
                           <TableCell className="text-xs">Oct 24, 2023</TableCell>
@@ -501,18 +554,24 @@ export function FabricJobsHome({
                           </TableCell>
 
                           <TableCell className="text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button size="icon" variant="ghost">
-                                  <MoreVertical className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem>View Details</DropdownMenuItem>
-                                <DropdownMenuItem>Run Now</DropdownMenuItem>
-                                <DropdownMenuItem>View Logs</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            <Button 
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const originalData = getOriginalItemData(job);
+                                setSelectedItem({ 
+                                  type: job.type, 
+                                  data: {
+                                    ...originalData,
+                                    workspace: job.workspace,
+                                    status: job.status,
+                                    lastModified: job.lastModified
+                                  }
+                                });
+                              }}
+                            >
+                              View Details
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -562,6 +621,14 @@ export function FabricJobsHome({
         onClose={() => setShowFabricModal(false)}
         onConnect={handleConnectFabric}
       />
+
+      {selectedItem && (
+        <DetailModal 
+          item={selectedItem} 
+          onClose={() => setSelectedItem(null)} 
+        />
+      )}
+
     </div>
   );
 }
