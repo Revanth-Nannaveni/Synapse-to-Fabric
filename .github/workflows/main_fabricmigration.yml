@@ -13,7 +13,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read #This is required for actions/checkout
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -22,6 +22,22 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '22.x'
+
+      # 🔐 Inject VITE env vars at build time
+      - name: Create production env file
+        run: |
+          echo "VITE_AZURE_CLIENT_ID=${{ secrets.VITE_AZURE_CLIENT_ID }}" >> .env
+          echo "VITE_AZURE_TENANT_ID=${{ secrets.VITE_AZURE_TENANT_ID }}" >> .env
+          echo "VITE_REDIRECT_URI=${{ secrets.VITE_REDIRECT_URI }}" >> .env
+          echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}" >> .env
+          echo "VITE_API_CODE_LIST_FABRIC_WORKSPACES=${{ secrets.VITE_API_CODE_LIST_FABRIC_WORKSPACES }}" >> .env
+          echo "VITE_API_CODE_CONNECT_SYNAPSE=${{ secrets.VITE_API_CODE_CONNECT_SYNAPSE }}" >> .env
+          echo "VITE_API_CODE_CONNECT_FABRIC=${{ secrets.VITE_API_CODE_CONNECT_FABRIC }}" >> .env
+          echo "VITE_API_CODE_SPARK_POOL_MIGRATION=${{ secrets.VITE_API_CODE_SPARK_POOL_MIGRATION }}" >> .env
+          echo "VITE_API_CODE_NOTEBOOKS_MIGRATION=${{ secrets.VITE_API_CODE_NOTEBOOKS_MIGRATION }}" >> .env
+          echo "VITE_API_CODE_PIPELINES_MIGRATION=${{ secrets.VITE_API_CODE_PIPELINES_MIGRATION }}" >> .env
+          echo "VITE_API_CODE_LIST_CAPACITIES=${{ secrets.VITE_API_CODE_LIST_CAPACITIES }}" >> .env
+          echo "VITE_API_CODE_CREATE_FABRIC_WORKSPACES=${{ secrets.VITE_API_CODE_CREATE_FABRIC_WORKSPACES }}" >> .env
 
       - name: npm install, build, and test
         run: |
@@ -33,7 +49,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: .
+          path: dist   # 👈 Vite outputs to dist
 
   deploy:
     runs-on: ubuntu-latest
