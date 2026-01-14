@@ -350,7 +350,7 @@ export function MigrationWorkspace({
       
       try {
         const sparkResponse = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/SparkPoolMigration?code=${import.meta.env.VITE_API_CODE_SPARK_POOL_MIGRATION}`,
+          `https://synapsetofabricfunc-fmg2d2ejctg2eacu.eastus-01.azurewebsites.net/api/SparkPoolMigration?code=HfwGAGfirHgSTgWoZKTY_pUKlOnDUQe1moz5E9WyQm25AzFutfxqPA==`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -408,7 +408,7 @@ export function MigrationWorkspace({
       
       try {
         const notebookResponse = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/NotebooksMigration?code=${import.meta.env.VITE_API_CODE_NOTEBOOKS_MIGRATION}`,
+          `https://synapsetofabricfunc-fmg2d2ejctg2eacu.eastus-01.azurewebsites.net/api/NotebooksMigration?code=_L6yqszQwmXCOK3O1JV6mYvDYJ_Pc8SKhattlpxeG1e5AzFuF7IXoQ==`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -465,7 +465,7 @@ export function MigrationWorkspace({
       
       try {
         const pipelineResponse = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/PipelinesMigration?code=${import.meta.env.VITE_API_CODE_PIPELINES_MIGRATION}`,
+          `https://synapsetofabricfunc-fmg2d2ejctg2eacu.eastus-01.azurewebsites.net/api/PipelinesMigration?code=3KEsNu4LwfkgincTCz9-j5YZdj14EQkItywZpK4DfgLmAzFuxqtOYg==`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

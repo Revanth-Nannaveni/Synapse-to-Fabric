@@ -1,5 +1,3 @@
-import { useMsal } from "@azure/msal-react";
-import { loginRequest } from "@/auth/msalConfig";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -8,24 +6,29 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
 import { Database, Shield, ArrowRight } from "lucide-react";
 
 export function LoginPage() {
-  const { instance } = useMsal();
+  const { login } = useAuth();
 
-  const handleLogin = async () => {
-    try {
-      await instance.loginPopup(loginRequest);
-    } catch (error) {
-      console.error("Login failed", error);
-    }
-  };
+  console.log('[LoginPage] Rendering login page');
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
-      {/* (your background + layout stays the same) */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5 -z-10" />
+      
+      <div className="mb-8 text-center space-y-2">
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <Database className="w-8 h-8 text-primary" />
+          <h1 className="text-3xl font-bold">Synapse to Fabric</h1>
+        </div>
+        <p className="text-muted-foreground">
+          Transform your data infrastructure with confidence
+        </p>
+      </div>
 
-      <Card className="shadow-xl border-0 bg-card/80 backdrop-blur-sm">
+      <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center pb-4">
           <CardTitle className="text-xl">Welcome Back</CardTitle>
           <CardDescription>
@@ -34,12 +37,15 @@ export function LoginPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <Button
-            variant="azure"
-            size="xl"
+            variant="default"
+            size="lg"
             className="w-full"
-            onClick={handleLogin}
+            onClick={() => {
+              console.log('[LoginPage] Login button clicked');
+              login();
+            }}
           >
-            <Shield className="w-5 h-5" />
+            <Shield className="w-5 h-5 mr-2" />
             Login with Azure AD
             <ArrowRight className="w-4 h-4 ml-auto" />
           </Button>

@@ -56,7 +56,7 @@ export function ConnectFabricModal({ open, onClose, onConnect }: ConnectFabricMo
       };
 
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/connecttofabric?code=${import.meta.env.VITE_API_CODE_CONNECT_FABRIC}`,
+        `https://synapsetofabricfunc-fmg2d2ejctg2eacu.eastus-01.azurewebsites.net/api/connecttofabric?code=-uLDMTMfVhKD7YVC82HCl9UKzBKt9mnAXcjAFL7qGVoeAzFuHxsSWQ==`,
         {
           method: "POST",
           headers: {

@@ -54,6 +54,7 @@ import type { FabricJob, FabricApiResponse, Workspace } from "@/types/migration"
 import DetailModal from "../components/modals/DetailModal";
 import type { FabricWorkspace } from "@/types/migration";
 
+
 interface FabricJobsHomeProps {
   onLogout: () => void;
   onMigrateFromSynapse: () => void;
