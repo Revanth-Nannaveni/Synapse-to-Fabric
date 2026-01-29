@@ -73,7 +73,7 @@ export function ConnectSynapseModal({ open, onClose, onConnect }: ConnectSynapse
       console.log("Sending payload:", JSON.stringify(payload, null, 2));
 
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/ConnecttoSynapseWs?code=${import.meta.env.VITE_API_CODE_CONNECT_SYNAPSE}`,
+        `https://synapsetofabricfunc-fmg2d2ejctg2eacu.eastus-01.azurewebsites.net/api/ConnecttoSynapseWs?code=vvuvrJ8BIivLP6841TxFY3ydjNvHNy-Pap12hBYW-ozHAzFu5qh-5A==`,
         {
           method: "POST",
           headers: {

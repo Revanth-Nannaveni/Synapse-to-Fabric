@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { CheckCircle2, Clock, XCircle, AlertTriangle, Loader2 } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, AlertTriangle, Loader2, MinusCircle, Ban, FastForward, HelpCircle } from "lucide-react";
 import type { Status } from "@/types/migration";
 
 interface StatusBadgeProps {
@@ -37,6 +37,26 @@ const statusConfig: Record<Status, { icon: React.ElementType; className: string;
     icon: Clock,
     className: "status-badge bg-muted text-muted-foreground",
     label: "Pending",
+  },
+  Queued: {
+    icon: Clock,
+    className: "status-badge bg-blue-500/10 text-blue-600 border border-blue-500/20",
+    label: "Queued",
+  },
+  Cancelled: {
+    icon: Ban,
+    className: "status-badge bg-gray-500/10 text-gray-600 border border-gray-500/20",
+    label: "Cancelled",
+  },
+  Skipped: {
+    icon: FastForward,
+    className: "status-badge bg-yellow-500/10 text-yellow-600 border border-yellow-500/20",
+    label: "Skipped",
+  },
+  Unknown: {
+    icon: HelpCircle,
+    className: "status-badge bg-muted text-muted-foreground border border-border",
+    label: "Unknown",
   },
 };
 

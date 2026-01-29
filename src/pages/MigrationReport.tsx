@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,25 +27,22 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
-  RefreshCw,
   Home,
   ChevronRight,
   AlertTriangle,
 } from "lucide-react";
-import type { MigrationItem, Status } from "@/types/migration";
+import type { MigrationItem } from "@/types/migration";
 
 interface MigrationReportProps {
   items: MigrationItem[];
   onLogout: () => void;
   onBackToHome: () => void;
-  source?: "synapse" | "databricks";
 }
 
 export function MigrationReport({ 
   items: initialItems, 
   onLogout, 
-  onBackToHome,
-  source = "synapse"
+  onBackToHome
 }: MigrationReportProps) {
   const [items, setItems] = useState<MigrationItem[]>(initialItems);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -61,30 +57,21 @@ export function MigrationReport({
     { value: "LinkedService", label: "Linked Service" },
   ];
 
-  const databricksTypes = [
-    { value: "Job", label: "Job" },
-    { value: "Notebook", label: "Notebook" },
-    { value: "Workflow", label: "Workflow" },
-    { value: "DLT", label: "Delta Live Table" },
-  ];
-
-  const assetTypes = source === "databricks" ? databricksTypes : synapseTypes;
-
   useEffect(() => {
     setItems(initialItems);
   }, [initialItems]);
 
   const stats = {
     total: items.length,
-    success: items.filter((i: { status: string; }) => i.status === "Success").length,
-    running: items.filter((i: { status: string; }) => i.status === "Running").length,
-    failed: items.filter((i: { status: string; }) => i.status === "Failed").length,
+    success: items.filter(i => i.status === "Success").length,
+    running: items.filter(i => i.status === "Running").length,
+    failed: items.filter(i => i.status === "Failed").length,
   };
 
   const hasRunningItems = stats.running > 0;
   const progress = stats.total > 0 ? ((stats.success + stats.failed) / stats.total) * 100 : 0;
 
-  const filteredItems = items.filter((item: { status: any; type: any; name: string; }) => {
+  const filteredItems = items.filter(item => {
     const matchesStatus = statusFilter === "all" || item.status === statusFilter;
     const matchesType = typeFilter === "all" || item.type === typeFilter;
     const matchesSearch =
@@ -124,7 +111,7 @@ export function MigrationReport({
       metadata: {
         exportDate: new Date().toISOString(),
         exportedBy: "Migration Tool",
-        source: source === "databricks" ? "Databricks" : "Azure Synapse",
+        source: "Azure Synapse",
         target: "Microsoft Fabric",
         version: "3.1.0",
         itemsExported: itemsToExport.length,
@@ -145,7 +132,6 @@ export function MigrationReport({
         type: item.type,
         status: item.status,
         targetWorkspace: item.targetWorkspace || "N/A",
-        lastModified: item.lastModified,
         errorMessage: item.errorMessage || null,
         ...(item.runtimeVersion && { runtimeVersion: item.runtimeVersion }),
         ...(item.nodeType && { nodeType: item.nodeType }),
@@ -164,7 +150,7 @@ export function MigrationReport({
     
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
     const selectionSuffix = selectedItems.size > 0 ? '-selected' : '';
-    link.download = `migration-report${selectionSuffix}-${timestamp}.json`;
+    link.download = `synapse-migration-report${selectionSuffix}-${timestamp}.json`;
 
     document.body.appendChild(link);
     link.click();
@@ -181,16 +167,14 @@ export function MigrationReport({
             Home
           </button>
           <ChevronRight className="w-4 h-4" />
-          <span className="text-foreground font-medium">
-            {source === "databricks" ? "Databricks" : "Synapse"} Migration Report
-          </span>
+          <span className="text-foreground font-medium">Synapse Migration Report</span>
         </div>
 
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-foreground mb-1">Migration Report</h1>
+            <h1 className="text-2xl font-bold text-foreground mb-1">Synapse Migration Report</h1>
             <p className="text-sm text-muted-foreground">
-              Track the progress of your {source === "databricks" ? "Databricks" : "Synapse"} to Fabric migration
+              Track the progress of your Synapse to Fabric migration
             </p>
           </div>
           <div className="flex gap-3">
@@ -296,7 +280,7 @@ export function MigrationReport({
               placeholder="Search items..."
               className="pl-9"
               value={searchQuery}
-              onChange={(e: { target: { value: any; }; }) => setSearchQuery(e.target.value)}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -317,7 +301,7 @@ export function MigrationReport({
             </SelectTrigger>
             <SelectContent className="bg-popover">
               <SelectItem value="all">All Types</SelectItem>
-              {assetTypes.map((type) => (
+              {synapseTypes.map((type) => (
                 <SelectItem key={type.value} value={type.value}>
                   {type.label}
                 </SelectItem>
@@ -341,7 +325,6 @@ export function MigrationReport({
                 <TableHead>TYPE</TableHead>
                 <TableHead>TARGET WORKSPACE</TableHead>
                 <TableHead>STATUS</TableHead>
-                <TableHead>LAST MODIFIED</TableHead>
                 <TableHead>ERROR MESSAGE</TableHead>
               </TableRow>
             </TableHeader>
@@ -358,7 +341,7 @@ export function MigrationReport({
                   <TableCell className="font-medium">{item.name}</TableCell>
                   <TableCell>
                     <span className="px-2 py-1 rounded bg-muted text-xs">
-                      {assetTypes.find(t => t.value === item.type)?.label ?? item.type}
+                      {synapseTypes.find(t => t.value === item.type)?.label ?? item.type}
                     </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
@@ -366,9 +349,6 @@ export function MigrationReport({
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={item.status} />
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {item.lastModified}
                   </TableCell>
                   <TableCell>
                     {item.errorMessage ? (

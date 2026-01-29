@@ -1,32 +1,69 @@
 import { useState } from "react";
-import { useMsal } from "@azure/msal-react";
 import { FabricJobsHome } from "./FabricJobsHome";
 import { MigrationWorkspace } from "./MigrationWorkspace";
 import { DatabricksMigrationWorkspace } from "./DatabricksMigrationWorkspace";
 import { MigrationReport } from "./MigrationReport";
+import { DatabricksMigrationReport } from "./DatabricksMigrationReport";
 import { ConnectSynapseModal } from "@/components/modals/ConnectSynapseModal";
 import { ConnectDatabricksModal } from "@/components/modals/ConnectDatabricksModal";
-import { getMsalUser } from "@/auth/msalUser";
-import type { MigrationItem, SynapseConnection } from "@/types/migration";
+import { useAuth } from "@/contexts/AuthContext";
+import type { SynapseConnection } from "@/types/migration";
 
-type AppView = 
-  | "home" 
-  | "synapse-workspace" 
+type AppView =
+  | "home"
+  | "synapse-workspace"
   | "databricks-workspace"
-  | "migration-report";
+  | "synapse-migration-report"
+  | "databricks-migration-report";
+
+interface SynapseMigrationItem {
+  id: string;
+  name: string;
+  type: "SparkPool" | "Notebook" | "Pipeline" | "LinkedService";
+  status: "Success" | "Running" | "Failed" | "Ready";
+  targetWorkspace?: string;
+  lastModified: string;
+  errorMessage?: string;
+  runtimeVersion?: string;
+  nodeType?: string;
+  nodes?: number;
+  language?: string;
+  dependencies?: number;
+  activities?: number;
+}
+
+interface DatabricksMigrationItem {
+  id: string;
+  name: string;
+  type: "Job" | "Notebook" | "Cluster";
+  status: "Success" | "Running" | "Failed" | "Ready";
+  targetWorkspace?: string;
+  lastModified: string;
+  errorMessage?: string;
+  schedule?: string;
+  cluster?: string;
+  language?: string;
+  path?: string;
+  runtime?: string;
+  workers?: string;
+}
 
 const Index = () => {
-  const { instance } = useMsal();
-  const user = getMsalUser(instance);
+  const { user, logout } = useAuth();
+
   const [currentView, setCurrentView] = useState<AppView>("home");
   const [showSynapseModal, setShowSynapseModal] = useState(false);
   const [showDatabricksModal, setShowDatabricksModal] = useState(false);
-  const [migrationItems, setMigrationItems] = useState<MigrationItem[]>([]);
-  const [migrationSource, setMigrationSource] = useState<"synapse" | "databricks">("synapse");
+  
+  // Separate state for each migration type
+  const [synapseMigrationItems, setSynapseMigrationItems] = useState<SynapseMigrationItem[]>([]);
+  const [databricksMigrationItems, setDatabricksMigrationItems] = useState<DatabricksMigrationItem[]>([]);
+  
   const [synapseApiResponse, setSynapseApiResponse] = useState<any>(null);
+  const [databricksApiResponse, setDatabricksApiResponse] = useState<any>(null);
 
-  const handleLogout = async () => {
-    await instance.logoutPopup();
+  const handleLogout = () => {
+    logout();
   };
 
   const handleMigrateFromSynapse = () => {
@@ -37,40 +74,52 @@ const Index = () => {
     setShowDatabricksModal(true);
   };
 
-  const handleSynapseConnect = (connection: SynapseConnection, apiResponse: any) => {
-    console.log("Synapse connection established:", connection);
-    console.log("API Response received:", apiResponse);
-    
+  const handleSynapseConnect = (
+    connection: SynapseConnection,
+    apiResponse: any
+  ) => {
     setSynapseApiResponse(apiResponse);
     setShowSynapseModal(false);
     setCurrentView("synapse-workspace");
   };
 
-  const handleDatabricksConnect = (config: any) => {
+  const handleDatabricksConnect = (
+    config: any,
+    apiResponse: any
+  ) => {
+    setDatabricksApiResponse(apiResponse);
     setShowDatabricksModal(false);
     setCurrentView("databricks-workspace");
   };
 
- const handleMigrationComplete = (
-  items: MigrationItem[] | ((prev: MigrationItem[]) => MigrationItem[]), 
-  source?: "synapse" | "databricks"
-) => {
-  if (typeof items === 'function') {
-    // This is an update callback - just update the state
-    setMigrationItems(items);
-  } else {
-    // This is initial items - navigate to report and set source
-    setMigrationItems(items);
-    if (source) {
-      setMigrationSource(source);
+  const handleSynapseMigrationComplete = (
+    items: SynapseMigrationItem[] | ((prev: SynapseMigrationItem[]) => SynapseMigrationItem[])
+  ) => {
+    if (typeof items === "function") {
+      setSynapseMigrationItems(items);
+    } else {
+      setSynapseMigrationItems(items);
+      setCurrentView("synapse-migration-report");
     }
-    setCurrentView("migration-report");
-  }
-};
+  };
+
+  const handleSynapseMigrationUpdate = (
+    updateFn: (prev: SynapseMigrationItem[]) => SynapseMigrationItem[]
+  ) => {
+    setSynapseMigrationItems(updateFn);
+  };
+
+  const handleDatabricksMigrationComplete = (items: DatabricksMigrationItem[]) => {
+    setDatabricksMigrationItems(items);
+    setCurrentView("databricks-migration-report");
+  };
 
   const handleBackToHome = () => {
     setCurrentView("home");
     setSynapseApiResponse(null);
+    setDatabricksApiResponse(null);
+    setSynapseMigrationItems([]);
+    setDatabricksMigrationItems([]);
   };
 
   return (
@@ -80,7 +129,7 @@ const Index = () => {
           onLogout={handleLogout}
           onMigrateFromSynapse={handleMigrateFromSynapse}
           onMigrateFromDatabricks={handleMigrateFromDatabricks}
-          userName={user?.name || user?.firstName || "User"}
+          userName={user?.name || "User"}
         />
       )}
 
@@ -88,26 +137,34 @@ const Index = () => {
         <MigrationWorkspace
           onLogout={handleLogout}
           onBack={handleBackToHome}
-          onMigrationComplete={(items) => handleMigrationComplete(items, "synapse")}
-          onMigrationUpdate={(updateFn) => handleMigrationComplete(updateFn)}
+          onMigrationComplete={handleSynapseMigrationComplete}
+          onMigrationUpdate={handleSynapseMigrationUpdate}
           apiResponse={synapseApiResponse}
-          />
-      )}
-
-      {currentView === "databricks-workspace" && (
-        <DatabricksMigrationWorkspace
-          onLogout={handleLogout}
-          onBack={handleBackToHome}
-          onMigrationComplete={(items) => handleMigrationComplete(items, "databricks")}
         />
       )}
 
-      {currentView === "migration-report" && (
+      {currentView === "databricks-workspace" && databricksApiResponse && (
+        <DatabricksMigrationWorkspace
+          onLogout={handleLogout}
+          onBack={handleBackToHome}
+          onMigrationComplete={handleDatabricksMigrationComplete}
+          apiResponse={databricksApiResponse}
+        />
+      )}
+
+      {currentView === "synapse-migration-report" && (
         <MigrationReport
-          items={migrationItems}
+          items={synapseMigrationItems}
           onLogout={handleLogout}
           onBackToHome={handleBackToHome}
-          source={migrationSource}
+        />
+      )}
+
+      {currentView === "databricks-migration-report" && (
+        <DatabricksMigrationReport
+          items={databricksMigrationItems}
+          onLogout={handleLogout}
+          onBackToHome={handleBackToHome}
         />
       )}
 

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +6,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SelectTargetModal } from "@/components/modals/SelectTargetModal";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
+import { useDatabricksCredentials } from "@/contexts/DatabricksCredentialsContext";
 import type { Status } from "@/types/migration";
 
 import {
@@ -24,236 +25,139 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import {
-  FileText,
   Search,
   Filter,
-  Download,
-  Grid,
-  AlertTriangle,
   CheckCircle2,
   Database,
   BookOpen,
   Briefcase,
-  GitBranch,
   ArrowRight,
   X,
   ChevronRight,
   ChevronLeft,
-  LayoutGrid,
   Layers,
-  FileBarChart,
-  Monitor,
-  Settings,
   LogOut,
-  Workflow,
+  Server,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useFabricCredentials } from "@/contexts/FabricCredentialsContext";
+import { ConnectFabricModal } from "@/components/modals/ConnectFabricModal";
 
 interface DatabricksMigrationWorkspaceProps {
   onLogout: () => void;
   onBack: () => void;
   onMigrationComplete: (items: any[]) => void;
+  apiResponse: {
+    counts: {
+      notebooks: number;
+      folders: number;
+      jobs: number;
+      clusters: number;
+    };
+    notebooks: any[];
+    folders: any[];
+    jobs: any[];
+    clusters: any[];
+  };
 }
 
-// Mock Databricks data
-const mockJobs: {
-  id: string;
-  name: string;
-  schedule: string;
-  lastRun: string;
-  cluster: string;
-  status: Status;
-}[] = [
-  {
-    id: "1",
-    name: "Daily ETL Pipeline",
-    schedule: "0 0 * * *",
-    lastRun: "2 hours ago",
-    cluster: "prod-cluster-01",
-    status: "Success",
-  },
-  {
-    id: "2",
-    name: "ML Model Training",
-    schedule: "0 2 * * 1",
-    lastRun: "1 day ago",
-    cluster: "ml-cluster",
-    status: "Success",
-  },
-  {
-    id: "3",
-    name: "Data Validation",
-    schedule: "0 */4 * * *",
-    lastRun: "30 mins ago",
-    cluster: "prod-cluster-01",
-    status: "Running",
-  },
-  {
-    id: "4",
-    name: "Legacy Report Gen",
-    schedule: "Manual",
-    lastRun: "7 days ago",
-    cluster: "old-cluster",
-    status: "Failed",
-  },
-];
-
-const mockNotebooks: {
-  id: string;
-  name: string;
-  language: string;
-  lastModified: string;
-  path: string;
-  status: Status;
-}[] = [
-  {
-    id: "1",
-    name: "Customer_Segmentation",
-    language: "Python",
-    lastModified: "2 hours ago",
-    path: "/Users/data-eng/",
-    status: "Ready",
-  },
-  {
-    id: "2",
-    name: "Sales_Analysis",
-    language: "SQL",
-    lastModified: "1 day ago",
-    path: "/Shared/",
-    status: "Ready",
-  },
-  {
-    id: "3",
-    name: "Inventory_Forecasting",
-    language: "Scala",
-    lastModified: "3 days ago",
-    path: "/Users/ml-team/",
-    status: "Ready",
-  },
-  {
-    id: "4",
-    name: "Legacy_Transform",
-    language: "Python",
-    lastModified: "30 days ago",
-    path: "/Archive/",
-    status: "Deprecated",
-  },
-];
-
-const mockWorkflows: {
-  id: string;
-  name: string;
-  tasks: number;
-  schedule: string;
-  lastRun: string;
-  status: Status;
-}[] = [
-  {
-    id: "1",
-    name: "Customer_Data_Pipeline",
-    tasks: 5,
-    schedule: "Daily at 2:00 AM",
-    lastRun: "1 hour ago",
-    status: "Success",
-  },
-  {
-    id: "2",
-    name: "ML_Training_Workflow",
-    tasks: 8,
-    schedule: "Weekly on Monday",
-    lastRun: "2 days ago",
-    status: "Success",
-  },
-  {
-    id: "3",
-    name: "Data_Quality_Check",
-    tasks: 3,
-    schedule: "Every 6 hours",
-    lastRun: "4 hours ago",
-    status: "Running",
-  },
-  {
-    id: "4",
-    name: "Legacy_Batch_Process",
-    tasks: 4,
-    schedule: "Manual",
-    lastRun: "15 days ago",
-    status: "Failed",
-  },
-];
-
-const mockDLTs: {
-  id: string;
-  name: string;
-  type: string;
-  tables: number;
-  lastUpdate: string;
-  status: Status;
-}[] = [
-  {
-    id: "1",
-    name: "Customer_360_DLT",
-    type: "Continuous",
-    tables: 12,
-    lastUpdate: "1 hour ago",
-    status: "Running",
-  },
-  {
-    id: "2",
-    name: "Sales_ETL_DLT",
-    type: "Triggered",
-    tables: 8,
-    lastUpdate: "3 hours ago",
-    status: "Success",
-  },
-  {
-    id: "3",
-    name: "Marketing_Analytics_DLT",
-    type: "Continuous",
-    tables: 6,
-    lastUpdate: "30 mins ago",
-    status: "Success",
-  },
-  {
-    id: "4",
-    name: "Legacy_Data_Flow",
-    type: "Triggered",
-    tables: 4,
-    lastUpdate: "10 days ago",
-    status: "Failed",
-  },
-];
-
-type TabType = "jobs" | "notebooks" | "workflows" | "dlts";
-
-const menuItems = [
-  { id: "overview", label: "Overview", icon: LayoutGrid },
-  { id: "inventory", label: "Inventory", icon: Layers, active: true },
-  { id: "migrationPlan", label: "Migration Plan", icon: FileBarChart },
-  { id: "monitor", label: "Monitor", icon: Monitor },
-  { id: "settings", label: "Settings", icon: Settings },
-];
+type TabType = "jobs" | "notebooks" | "clusters";
 
 const inventoryItems = [
   { id: "jobs", label: "Jobs", icon: Briefcase },
   { id: "notebooks", label: "Notebooks", icon: BookOpen },
-  { id: "workflows", label: "Workflows", icon: Workflow },
-  { id: "dlts", label: "Delta Live Tables", icon: GitBranch },
+  { id: "clusters", label: "Clusters", icon: Server },
 ];
 
-export  function DatabricksMigrationWorkspace({ onLogout, onBack, onMigrationComplete }: DatabricksMigrationWorkspaceProps) {
+export function DatabricksMigrationWorkspace({
+  onLogout,
+  onBack,
+  onMigrationComplete,
+  apiResponse
+}: DatabricksMigrationWorkspaceProps) {
+  const { toast } = useToast();
+  const { credentials: databricksCredentials } = useDatabricksCredentials();
+  const { credentials: fabricCredentials, setCredentials: setFabricCredentials } = useFabricCredentials();
+
+  const transformedJobs = (apiResponse?.jobs || []).map((job: any, index: number) => ({
+    id: job.job_id?.toString() || index.toString(),
+    name: job.settings?.name || `Job ${index + 1}`,
+    schedule: job.settings?.schedule?.quartz_cron_expression ||
+      job.settings?.trigger?.pause_status || "Manual",
+    lastRun: job.last_run?.start_time ?
+      new Date(job.last_run.start_time).toLocaleString() : "N/A",
+    cluster: job.settings?.tasks?.[0]?.existing_cluster_id ||
+      job.settings?.job_clusters?.[0]?.new_cluster?.cluster_name ||
+      job.settings?.new_cluster?.cluster_name || "N/A",
+    status: (job.last_run?.state?.life_cycle_state === "TERMINATED" &&
+      job.last_run?.state?.result_state === "SUCCESS") ? "Success" :
+      job.last_run?.state?.life_cycle_state === "RUNNING" ? "Running" :
+        job.last_run?.state?.result_state === "FAILED" ? "Failed" : "Ready" as Status,
+  }));
+
+  const transformedNotebooks = (apiResponse?.notebooks || []).map((notebook: any, index: number) => ({
+    id: index.toString(),
+    name: notebook.name || notebook.path?.split('/').pop() || `Notebook ${index + 1}`,
+    language: notebook.language || "Unknown",
+    lastModified: "N/A",
+    path: notebook.path || "/",
+    status: "Ready" as Status,
+  }));
+
+  const transformedClusters = (apiResponse?.clusters || []).map((cluster: any, index: number) => ({
+    id: cluster.cluster_id || index.toString(),
+    name: cluster.cluster_name || `Cluster ${index + 1}`,
+    type: cluster.cluster_source || "Interactive",
+    state: cluster.state || "Unknown",
+    runtime: cluster.spark_version || "N/A",
+    workers: cluster.num_workers !== undefined ? cluster.num_workers.toString() : "N/A",
+    status: (cluster.state === "RUNNING" ? "Running" :
+      cluster.state === "TERMINATED" ? "Success" :
+        cluster.state === "ERROR" ? "Failed" : "Ready") as Status,
+  }));
+
   const [activeTab, setActiveTab] = useState<TabType>("jobs");
   const [selectedItems, setSelectedItems] = useState<Record<TabType, string[]>>({
     jobs: [],
     notebooks: [],
-    workflows: [],
-    dlts: [],
+    clusters: [],
   });
   const [showReview, setShowReview] = useState(false);
   const [showTargetModal, setShowTargetModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [showFabricModal, setShowFabricModal] = useState(false);
+
+  const handleFabricConnect = (apiResponse: any) => {
+    setShowFabricModal(false);
+    setShowReview(true);
+  };
+
+  const handleMigrateClick = () => {
+    const selectedDetails = getSelectedItemDetails();
+    const hasNotebooks = selectedDetails.some(item => item.type === "Notebook");
+    const hasJobs = selectedDetails.some(item => item.type === "Job");
+    const hasClusters = selectedDetails.some(item => item.type === "Cluster");
+
+    if (!hasNotebooks && !hasJobs && !hasClusters) {
+      toast({
+        title: "No Items Selected",
+        description: "Please select at least one item to migrate.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!fabricCredentials) {
+      setShowFabricModal(true);
+    } else {
+      setShowReview(true);
+    }
+  };
 
   const toggleSelection = (tab: TabType, id: string) => {
     setSelectedItems((prev) => ({
@@ -273,44 +177,40 @@ export  function DatabricksMigrationWorkspace({ onLogout, onBack, onMigrationCom
     }));
   };
 
-  const filterItems = <T extends { name: string; status: Status }>(items: T[]) => {
+  const filterItems = <T extends Record<string, any>>(items: T[]) => {
     return items.filter((item) => {
-      const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const searchableFields = Object.values(item).join(' ').toLowerCase();
+      const matchesSearch = searchableFields.includes(searchQuery.toLowerCase());
+
       const matchesStatus = statusFilter === "all" || item.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
   };
 
-  const filteredJobs = filterItems(mockJobs);
-  const filteredNotebooks = filterItems(mockNotebooks);
-  const filteredWorkflows = filterItems(mockWorkflows);
-  const filteredDLTs = filterItems(mockDLTs);
+  const filteredJobs = filterItems(transformedJobs);
+  const filteredNotebooks = filterItems(transformedNotebooks);
+  const filteredClusters = filterItems(transformedClusters);
 
-  const statusOptions = ["all", "Success", "Running", "Failed", "Ready", "Deprecated"];
+  const statusOptions = ["all", "Success", "Running", "Failed", "Ready"];
 
   const totalSelected =
     selectedItems.jobs.length +
-    selectedItems.notebooks.length + 
-    selectedItems.workflows.length +
-    selectedItems.dlts.length;
+    selectedItems.notebooks.length +
+    selectedItems.clusters.length;
 
   const getSelectedItemDetails = () => {
     const items: any[] = [];
     selectedItems.jobs.forEach((id) => {
-      const item = mockJobs.find((j) => j.id === id);
+      const item = transformedJobs.find((j) => j.id === id);
       if (item) items.push({ ...item, type: "Job", source: "databricks" });
     });
     selectedItems.notebooks.forEach((id) => {
-      const item = mockNotebooks.find((n) => n.id === id);
+      const item = transformedNotebooks.find((n) => n.id === id);
       if (item) items.push({ ...item, type: "Notebook", source: "databricks" });
     });
-    selectedItems.workflows.forEach((id) => {
-      const item = mockWorkflows.find((w) => w.id === id);
-      if (item) items.push({ ...item, type: "Workflow", source: "databricks" });
-    });
-    selectedItems.dlts.forEach((id) => {
-      const item = mockDLTs.find((p) => p.id === id);
-      if (item) items.push({ ...item, type: "DLT", source: "databricks" });
+    selectedItems.clusters.forEach((id) => {
+      const item = transformedClusters.find((c) => c.id === id);
+      if (item) items.push({ ...item, type: "Cluster", source: "databricks" });
     });
     return items;
   };
@@ -319,8 +219,7 @@ export  function DatabricksMigrationWorkspace({ onLogout, onBack, onMigrationCom
     const tabMap: Record<string, TabType> = {
       Job: "jobs",
       Notebook: "notebooks",
-      Workflow: "workflows",
-      DLT: "dlts",
+      Cluster: "clusters",
     };
     const tab = tabMap[type];
     if (tab) {
@@ -331,17 +230,351 @@ export  function DatabricksMigrationWorkspace({ onLogout, onBack, onMigrationCom
     }
   };
 
-  const handleStartMigration = (workspace: any) => {
-    const items = getSelectedItemDetails().map((item) => ({
+  // Helper function to migrate notebooks
+  const migrateNotebooks = async (workspace: any, notebooks: any[]) => {
+    const payload = {
+      tenantId: fabricCredentials!.tenantId,
+      clientId: fabricCredentials!.clientId,
+      clientSecret: fabricCredentials!.clientSecret,
+      workspaceId: workspace.id,
+      databricksUrl: databricksCredentials!.databricksUrl,
+      personalAccessToken: databricksCredentials!.personalAccessToken,
+      notebooks: notebooks.map(nb => ({
+        name: nb.name,
+        path: nb.path
+      }))
+    };
+
+    console.log("Notebook migration payload:", payload);
+
+    const response = await fetch(
+      "https://databrickstofabric-fuhdb8a7dhbebrf5.eastus-01.azurewebsites.net/api/MigrateNotebooks?code=0KjRO6OQdRDSj6_ahlRgYhxO2dGy07eCqqegZMeuFJrzAzFuJcusuA==",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Notebook migration failed: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log("Notebook migration result:", result);
+
+    return notebooks.map(item => {
+      const detail = result.details.find((d: any) => d.name === item.name);
+      
+      let status: "Success" | "Failed" | "Running" = "Running";
+      let errorMessage: string | undefined = undefined;
+
+      if (detail) {
+        if (detail.status === "created") {
+          status = "Success";
+        } else if (detail.status === "already-exists") {
+          status = "Failed";
+          errorMessage = "already exists";
+        } else if (detail.status === "failed") {
+          status = "Failed";
+          errorMessage = detail.error || "Migration failed";
+        }
+      }
+
+      return {
+        ...item,
+        targetWorkspace: workspace.name,
+        status,
+        errorMessage,
+        migrationStatus: detail?.status || "unknown"
+      };
+    });
+  };
+
+  // Helper function to migrate jobs
+  const migrateJobs = async (workspace: any, jobs: any[]) => {
+    const payload = {
+      tenantId: fabricCredentials!.tenantId,
+      clientId: fabricCredentials!.clientId,
+      clientSecret: fabricCredentials!.clientSecret,
+      workspaceId: workspace.id,
+      databricksUrl: databricksCredentials!.databricksUrl,
+      personalAccessToken: databricksCredentials!.personalAccessToken,
+      jobid: jobs.map(job => job.id)
+    };
+
+    console.log("Job migration payload:", payload);
+
+    const response = await fetch(
+      "https://databrickstofabric-fuhdb8a7dhbebrf5.eastus-01.azurewebsites.net/api/MigrateJob?code=e7lz1_ZOu--IpJDQY2Clu20N-oXkZQgN5A3GpqGvtsHYAzFuL1d4KQ==",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Job migration failed: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log("Job migration result:", result);
+
+    // Process each job based on the API response
+    return jobs.map(item => {
+      // Check in created array
+      const createdDetail = result.created?.find((d: any) => d.job_id === item.id);
+      // Check in already_exist array
+      const existsDetail = result.already_exist?.find((d: any) => d.job_id === item.id);
+      // Check in failed array
+      const failedDetail = result.failed?.find((d: any) => d.job_id === item.id);
+      
+      let status: "Success" | "Failed" | "Running" = "Running";
+      let errorMessage: string | undefined = undefined;
+      let fabricPipelineId: string | undefined = undefined;
+
+      if (createdDetail) {
+        status = "Success";
+        fabricPipelineId = createdDetail.fabric_pipeline_id;
+      } else if (existsDetail) {
+        status = "Failed";
+        errorMessage = "already exists";
+        fabricPipelineId = existsDetail.fabric_pipeline_id;
+      } else if (failedDetail) {
+        status = "Failed";
+        errorMessage = failedDetail.error || "Migration failed";
+      }
+
+      return {
+        ...item,
+        targetWorkspace: workspace.name,
+        status,
+        errorMessage,
+        fabricPipelineId,
+        migrationStatus: createdDetail ? "created" : existsDetail ? "already-exists" : failedDetail ? "failed" : "unknown"
+      };
+    });
+  };
+
+  // Helper function to migrate clusters
+  const migrateClusters = async (workspace: any, clusters: any[], capacityId: string) => {
+    const payload = {
+      databricks: {
+        host: databricksCredentials!.databricksUrl,
+        pat: databricksCredentials!.personalAccessToken
+      },
+      fabric: {
+        tenantId: fabricCredentials!.tenantId,
+        clientId: fabricCredentials!.clientId,
+        clientSecret: fabricCredentials!.clientSecret,
+        capacityId: capacityId,
+        workspaceId: workspace.id
+      },
+      selectedClusters: clusters.map(cluster => cluster.id)
+    };
+
+    console.log("Cluster migration payload:", payload);
+
+    const response = await fetch(
+      "https://databrickstofabric-fuhdb8a7dhbebrf5.eastus-01.azurewebsites.net/api/ClusterMigration?code=qgKVGHfeCG_K_LHs0UGkxqhZeou2CoF63d0adXhn9qErAzFu9KBvEQ==",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Cluster migration failed: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log("Cluster migration result:", result);
+
+    // Process each cluster based on the API response
+    return clusters.map(item => {
+      // Check if cluster is in Success array (by name or id)
+      const isSuccess = result.Success?.some((name: string) => 
+        name === item.name || name === item.id
+      );
+      
+      // Check if cluster is in Failed array
+      const failedDetail = result.Failed?.find((f: any) => 
+        f.name === item.name || f.name === item.id
+      );
+      
+      let status: "Success" | "Failed" | "Running" = "Running";
+      let errorMessage: string | undefined = undefined;
+
+      if (isSuccess) {
+        status = "Success";
+      } else if (failedDetail) {
+        status = "Failed";
+        errorMessage = failedDetail.message || "Migration failed";
+      }
+
+      return {
+        ...item,
+        targetWorkspace: workspace.name,
+        status,
+        errorMessage,
+        migrationStatus: isSuccess ? "created" : failedDetail ? "failed" : "unknown"
+      };
+    });
+  };
+
+  const handleStartMigration = async (workspace: any) => {
+    const selectedDetails = getSelectedItemDetails();
+    const notebooksToMigrate = selectedDetails.filter(item => item.type === "Notebook");
+    const jobsToMigrate = selectedDetails.filter(item => item.type === "Job");
+    const clustersToMigrate = selectedDetails.filter(item => item.type === "Cluster");
+
+    if (notebooksToMigrate.length === 0 && jobsToMigrate.length === 0 && clustersToMigrate.length === 0) {
+      toast({
+        title: "No Items Selected",
+        description: "Please select at least one item to migrate.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!databricksCredentials?.databricksUrl || !databricksCredentials?.personalAccessToken) {
+      toast({
+        title: "Missing Databricks Credentials",
+        description: "Databricks credentials not found. Please reconnect.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!fabricCredentials?.tenantId || !fabricCredentials?.clientId || !fabricCredentials?.clientSecret) {
+      toast({
+        title: "Missing Fabric Credentials",
+        description: "Fabric credentials not found. Please connect to Fabric.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsMigrating(true);
+    setShowTargetModal(false);
+
+    // Step 1: Create initial items with "Running" status
+    const allItemsToMigrate = [...notebooksToMigrate, ...jobsToMigrate, ...clustersToMigrate];
+    const initialMigrationItems = allItemsToMigrate.map(item => ({
       ...item,
       targetWorkspace: workspace.name,
       status: "Running" as const,
     }));
-    onMigrationComplete(items);
+
+    // Step 2: Navigate to report immediately with "Running" status
+    onMigrationComplete(initialMigrationItems);
+
+    // Step 3: Start migrations in parallel
+    try {
+      const results = await Promise.allSettled([
+        // Migrate notebooks if any
+        notebooksToMigrate.length > 0 ? migrateNotebooks(workspace, notebooksToMigrate) : Promise.resolve(null),
+        // Migrate jobs if any
+        jobsToMigrate.length > 0 ? migrateJobs(workspace, jobsToMigrate) : Promise.resolve(null),
+        // Migrate clusters if any
+        clustersToMigrate.length > 0 ? migrateClusters(workspace, clustersToMigrate, workspace.capacity) : Promise.resolve(null)
+      ]);
+
+      const [notebookResult, jobResult, clusterResult] = results;
+
+      // Combine results
+      const updatedItems: any[] = [];
+
+      // Process notebook results
+      if (notebookResult.status === 'fulfilled' && notebookResult.value) {
+        updatedItems.push(...notebookResult.value);
+      } else if (notebookResult.status === 'rejected') {
+        // All notebooks failed
+        updatedItems.push(...notebooksToMigrate.map(item => ({
+          ...item,
+          targetWorkspace: workspace.name,
+          status: "Failed" as const,
+          errorMessage: "Notebook migration failed"
+        })));
+      }
+
+      // Process job results
+      if (jobResult.status === 'fulfilled' && jobResult.value) {
+        updatedItems.push(...jobResult.value);
+      } else if (jobResult.status === 'rejected') {
+        // All jobs failed
+        updatedItems.push(...jobsToMigrate.map(item => ({
+          ...item,
+          targetWorkspace: workspace.name,
+          status: "Failed" as const,
+          errorMessage: "Job migration failed"
+        })));
+      }
+
+      // Process cluster results
+      if (clusterResult.status === 'fulfilled' && clusterResult.value) {
+        updatedItems.push(...clusterResult.value);
+      } else if (clusterResult.status === 'rejected') {
+        // All clusters failed
+        updatedItems.push(...clustersToMigrate.map(item => ({
+          ...item,
+          targetWorkspace: workspace.name,
+          status: "Failed" as const,
+          errorMessage: "Cluster migration failed"
+        })));
+      }
+
+      // Step 4: Update the report with final statuses
+      onMigrationComplete(updatedItems);
+
+      // Show summary toast
+      const successCount = updatedItems.filter(i => i.status === "Success").length;
+      const failedCount = updatedItems.filter(i => i.status === "Failed").length;
+
+      toast({
+        title: "Migration Complete",
+        description: `Successfully migrated: ${successCount}, Failed: ${failedCount}`,
+      });
+
+    } catch (error) {
+      console.error("Migration error:", error);
+      
+      // Update all items to Failed status
+      const failedItems = allItemsToMigrate.map(item => ({
+        ...item,
+        targetWorkspace: workspace.name,
+        status: "Failed" as const,
+        errorMessage: error instanceof Error ? error.message : "An error occurred during migration"
+      }));
+      
+      onMigrationComplete(failedItems);
+
+      toast({
+        title: "Migration Failed",
+        description: error instanceof Error ? error.message : "An error occurred during migration",
+        variant: "destructive",
+      });
+    } finally {
+      setIsMigrating(false);
+    }
   };
+
+  const totalAssets = transformedJobs.length + transformedNotebooks.length + transformedClusters.length;
 
   if (showReview) {
     const selectedDetails = getSelectedItemDetails();
+    const hasNotebooks = selectedDetails.some(item => item.type === "Notebook");
+    const hasJobs = selectedDetails.some(item => item.type === "Job");
+    const hasClusters = selectedDetails.some(item => item.type === "Cluster");
+
     return (
       <div className="min-h-screen bg-background">
         <main className="p-6 max-w-4xl mx-auto animate-fade-in">
@@ -358,6 +591,13 @@ export  function DatabricksMigrationWorkspace({ onLogout, onBack, onMigrationCom
               <CardTitle>Review Selected Items</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {!hasNotebooks && !hasJobs && !hasClusters && (
+                <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-sm text-amber-600">
+                  <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <p>Please select at least one item to migrate.</p>
+                </div>
+              )}
+
               {selectedItems.jobs.length > 0 && (
                 <div>
                   <h4 className="font-medium mb-3 flex items-center gap-2">
@@ -424,15 +664,15 @@ export  function DatabricksMigrationWorkspace({ onLogout, onBack, onMigrationCom
                 </div>
               )}
 
-              {selectedItems.workflows.length > 0 && (
+              {selectedItems.clusters.length > 0 && (
                 <div>
                   <h4 className="font-medium mb-3 flex items-center gap-2">
-                    <Workflow className="w-4 h-4 text-primary" />
-                    Workflows ({selectedItems.workflows.length})
+                    <Server className="w-4 h-4 text-primary" />
+                    Clusters ({selectedItems.clusters.length})
                   </h4>
                   <div className="space-y-2">
                     {selectedDetails
-                      .filter((i) => i.type === "Workflow")
+                      .filter((i) => i.type === "Cluster")
                       .map((item) => (
                         <div
                           key={item.id}
@@ -441,46 +681,13 @@ export  function DatabricksMigrationWorkspace({ onLogout, onBack, onMigrationCom
                           <div>
                             <p className="font-medium">{item.name}</p>
                             <p className="text-sm text-muted-foreground">
-                              {item.tasks} tasks • {item.schedule}
+                              {item.type} • {item.runtime}
                             </p>
                           </div>
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => removeFromSelection("Workflow", item.id)}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedItems.dlts.length > 0 && (
-                <div>
-                  <h4 className="font-medium mb-3 flex items-center gap-2">
-                    <GitBranch className="w-4 h-4 text-primary" />
-                    Delta Live Tables ({selectedItems.dlts.length})
-                  </h4>
-                  <div className="space-y-2">
-                    {selectedDetails
-                      .filter((i) => i.type === "DLT")
-                      .map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                        >
-                          <div>
-                            <p className="font-medium">{item.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {item.type} • {item.tables} tables
-                            </p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeFromSelection("DLT", item.id)}
+                            onClick={() => removeFromSelection("Cluster", item.id)}
                           >
                             <X className="w-4 h-4" />
                           </Button>
@@ -497,8 +704,9 @@ export  function DatabricksMigrationWorkspace({ onLogout, onBack, onMigrationCom
                 <Button
                   variant="azure"
                   onClick={() => setShowTargetModal(true)}
-                  disabled={totalSelected === 0}
+                  disabled={(!hasNotebooks && !hasJobs && !hasClusters) || isMigrating}
                 >
+                  {isMigrating && <Loader2 className="w-4 h-4 animate-spin" />}
                   Migrate
                   <ArrowRight className="w-4 h-4" />
                 </Button>
@@ -512,26 +720,14 @@ export  function DatabricksMigrationWorkspace({ onLogout, onBack, onMigrationCom
           onClose={() => setShowTargetModal(false)}
           onConfirm={handleStartMigration}
         />
-        
+
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Databricks Sidebar */}
       <aside className="w-64 min-h-screen bg-sidebar border-r flex flex-col">
-        {/* Logo */}
-        <div className="p-4 border-b">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-              <Database className="w-5 h-5 text-sidebar-primary-foreground" />
-            </div>
-            <span className="font-semibold text-sidebar-foreground">MigratePro</span>
-          </div>
-        </div>
-
-        {/* Workspace Selector */}
         <div className="p-4 border-b">
           <button
             onClick={onBack}
@@ -548,190 +744,112 @@ export  function DatabricksMigrationWorkspace({ onLogout, onBack, onMigrationCom
             </Avatar>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-sidebar-foreground truncate">
-                Databricks Works...
+                Databricks Workspace
               </p>
               <p className="text-xs text-muted-foreground">Admin Access</p>
             </div>
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 p-3">
+        <nav className="flex-1 p-3 pt-16">
           <ul className="space-y-1">
-            {menuItems.map((item) => (
-              <li key={item.id}>
-                <button
-                  onClick={() => {}}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
-                    item.id === "inventory"
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <item.icon className="w-4 h-4" />
-                  {item.label}
-                </button>
+            <li>
+              <button
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+              >
+                <Layers className="w-4 h-4" />
+                Inventory
+              </button>
 
-                {/* Sub-items for Inventory */}
-                {item.id === "inventory" && (
-                  <ul className="ml-4 mt-1 space-y-1 border-l pl-3">
-                    {inventoryItems.map((subItem) => (
-                      <li key={subItem.id}>
-                        <button
-                          onClick={() => setActiveTab(subItem.id as TabType)}
-                          className={cn(
-                            "w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors",
-                            activeTab === subItem.id
-                              ? "text-primary font-medium"
-                              : "text-muted-foreground hover:text-sidebar-foreground"
-                          )}
-                        >
-                          <subItem.icon className="w-3.5 h-3.5" />
-                          {subItem.label}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            ))}
+              <ul className="ml-4 mt-1 space-y-1 border-l pl-3">
+                {inventoryItems.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      onClick={() => setActiveTab(item.id as TabType)}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors",
+                        activeTab === item.id
+                          ? "text-primary font-medium"
+                          : "text-muted-foreground hover:text-sidebar-foreground"
+                      )}
+                    >
+                      <item.icon className="w-3.5 h-3.5" />
+                      {item.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </li>
           </ul>
         </nav>
-
-        {/* Footer */}
-        <div className="p-4 border-t">
-          <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground w-full">
-            <LogOut className="w-4 h-4" />
-            Sign Out
-          </button>
-        </div>
       </aside>
 
       <div className="flex-1">
-
         <main className="p-6 animate-fade-in">
-          {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
             <span>Home</span>
-            <ChevronRight className="w-4 h-4" />
-            <span>Projects</span>
             <ChevronRight className="w-4 h-4" />
             <span>Databricks Workspace</span>
             <ChevronRight className="w-4 h-4" />
             <span className="text-foreground font-medium">Discovery Results</span>
           </div>
 
-          {/* Header */}
           <div className="flex items-start justify-between mb-6">
             <div>
               <h1 className="text-2xl font-bold text-foreground mb-1">Discovery Results</h1>
               <p className="text-sm text-success flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4" />
-                Scan completed successfully on Dec 18, 2024
+                Scan completed successfully
               </p>
             </div>
-            <div className="flex gap-3">
-              <Button variant="outline">
-                <FileText className="w-4 h-4" />
-                Export Report
-              </Button>
-              <Button
-                variant="azure"
-                disabled={totalSelected === 0}
-                onClick={() => setShowReview(true)}
-              >
-                Migrate Selected
-              </Button>
-            </div>
+            <Button
+              variant="azure"
+              disabled={totalSelected === 0 || isMigrating}
+              onClick={handleMigrateClick}
+            >
+              {isMigrating && <Loader2 className="w-4 h-4 animate-spin" />}
+              Migrate Selected ({totalSelected})
+            </Button>
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Assets</p>
-                  <p className="text-3xl font-bold text-foreground">
-                    {mockJobs.length + mockNotebooks.length + mockWorkflows.length + mockDLTs.length}
-                  </p>
-                </div>
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Grid className="w-5 h-5 text-primary" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Ready to Migrate</p>
-                  <p className="text-3xl font-bold text-success">12</p>
-                </div>
-                <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center">
-                  <CheckCircle2 className="w-5 h-5 text-success" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Conflicts / Errors</p>
-                  <p className="text-3xl font-bold text-destructive">3</p>
-                </div>
-                <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-destructive" />
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* Tabs */}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
             <TabsList className="bg-muted/50 mb-4">
               <TabsTrigger value="jobs" className="gap-2">
                 <Briefcase className="w-4 h-4" />
                 Jobs
                 <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary/10 text-primary rounded">
-                  {mockJobs.length}
+                  {transformedJobs.length}
                 </span>
               </TabsTrigger>
               <TabsTrigger value="notebooks" className="gap-2">
                 <BookOpen className="w-4 h-4" />
                 Notebooks
                 <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary/10 text-primary rounded">
-                  {mockNotebooks.length}
+                  {transformedNotebooks.length}
                 </span>
               </TabsTrigger>
-              <TabsTrigger value="workflows" className="gap-2">
-                <Workflow className="w-4 h-4" />
-                Workflows
+              <TabsTrigger value="clusters" className="gap-2">
+                <Server className="w-4 h-4" />
+                Clusters
                 <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary/10 text-primary rounded">
-                  {mockWorkflows.length}
-                </span>
-              </TabsTrigger>
-              <TabsTrigger value="dlts" className="gap-2">
-                <GitBranch className="w-4 h-4" />
-                Delta Live Tables
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary/10 text-primary rounded">
-                  {mockDLTs.length}
+                  {transformedClusters.length}
                 </span>
               </TabsTrigger>
             </TabsList>
 
-            {/* Search & Filters */}
             <div className="flex items-center gap-3 mb-4">
               <div className="relative flex-1 max-w-sm">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Search items..."
+                  placeholder="Search across all fields..."
                   className="pl-9"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
               <div className="relative">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => setShowStatusMenu(!showStatusMenu)}
                 >
@@ -848,11 +966,11 @@ export  function DatabricksMigrationWorkspace({ onLogout, onBack, onMigrationCom
                           onCheckedChange={() => toggleAll("notebooks", filteredNotebooks)}
                         />
                       </TableHead>
-                      <TableHead>NOTEBOOK NAME</TableHead>
-                      <TableHead>LANGUAGE</TableHead>
-                      <TableHead>PATH</TableHead>
-                      <TableHead>LAST MODIFIED</TableHead>
-                      <TableHead>STATUS</TableHead>
+                      <TableHead className="min-w-[200px]">NOTEBOOK NAME</TableHead>
+                      <TableHead className="w-[120px]">LANGUAGE</TableHead>
+                      <TableHead className="min-w-[250px] max-w-[350px]">PATH</TableHead>
+                      <TableHead className="w-[150px]">LAST MODIFIED</TableHead>
+                      <TableHead className="w-[100px]">STATUS</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -880,7 +998,11 @@ export  function DatabricksMigrationWorkspace({ onLogout, onBack, onMigrationCom
                             </div>
                           </TableCell>
                           <TableCell>{notebook.language}</TableCell>
-                          <TableCell>{notebook.path}</TableCell>
+                          <TableCell>
+                            <div className="max-w-[350px] break-words whitespace-normal">
+                              {notebook.path}
+                            </div>
+                          </TableCell>
                           <TableCell>{notebook.lastModified}</TableCell>
                           <TableCell>
                             <StatusBadge status={notebook.status} />
@@ -893,109 +1015,53 @@ export  function DatabricksMigrationWorkspace({ onLogout, onBack, onMigrationCom
               </Card>
             </TabsContent>
 
-            <TabsContent value="workflows">
+            <TabsContent value="clusters">
               <Card>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">
                         <Checkbox
-                          checked={filteredWorkflows.length > 0 && filteredWorkflows.every((w) => selectedItems.workflows.includes(w.id))}
-                          onCheckedChange={() => toggleAll("workflows", filteredWorkflows)}
+                          checked={filteredClusters.length > 0 && filteredClusters.every((c) => selectedItems.clusters.includes(c.id))}
+                          onCheckedChange={() => toggleAll("clusters", filteredClusters)}
                         />
                       </TableHead>
-                      <TableHead>WORKFLOW NAME</TableHead>
-                      <TableHead>TASKS</TableHead>
-                      <TableHead>SCHEDULE</TableHead>
-                      <TableHead>LAST RUN</TableHead>
-                      <TableHead>STATUS</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredWorkflows.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                          No workflows found matching your filters
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredWorkflows.map((workflow) => (
-                        <TableRow key={workflow.id} className="hover:bg-muted/50">
-                          <TableCell>
-                            <Checkbox
-                              checked={selectedItems.workflows.includes(workflow.id)}
-                              onCheckedChange={() => toggleSelection("workflows", workflow.id)}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center">
-                                <Workflow className="w-3 h-3 text-primary" />
-                              </div>
-                              <span className="font-medium text-primary">{workflow.name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>{workflow.tasks}</TableCell>
-                          <TableCell>{workflow.schedule}</TableCell>
-                          <TableCell>{workflow.lastRun}</TableCell>
-                          <TableCell>
-                            <StatusBadge status={workflow.status} />
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="dlts">
-              <Card>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">
-                        <Checkbox
-                          checked={filteredDLTs.length > 0 && filteredDLTs.every((p) => selectedItems.dlts.includes(p.id))}
-                          onCheckedChange={() => toggleAll("dlts", filteredDLTs)}
-                        />
-                      </TableHead>
-                      <TableHead>DLT PIPELINE NAME</TableHead>
+                      <TableHead>CLUSTER NAME</TableHead>
                       <TableHead>TYPE</TableHead>
-                      <TableHead>TABLES</TableHead>
-                      <TableHead>LAST UPDATE</TableHead>
+                      <TableHead>RUNTIME</TableHead>
+                      <TableHead>WORKERS</TableHead>
                       <TableHead>STATUS</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredDLTs.length === 0 ? (
+                    {filteredClusters.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                          No Delta Live Tables found matching your filters
+                          No clusters found matching your filters
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredDLTs.map((dlt) => (
-                        <TableRow key={dlt.id} className="hover:bg-muted/50">
+                      filteredClusters.map((cluster) => (
+                        <TableRow key={cluster.id} className="hover:bg-muted/50">
                           <TableCell>
                             <Checkbox
-                              checked={selectedItems.dlts.includes(dlt.id)}
-                              onCheckedChange={() => toggleSelection("dlts", dlt.id)}
+                              checked={selectedItems.clusters.includes(cluster.id)}
+                              onCheckedChange={() => toggleSelection("clusters", cluster.id)}
                             />
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center">
-                                <GitBranch className="w-3 h-3 text-primary" />
+                                <Server className="w-3 h-3 text-primary" />
                               </div>
-                              <span className="font-medium text-primary">{dlt.name}</span>
+                              <span className="font-medium text-primary">{cluster.name}</span>
                             </div>
                           </TableCell>
-                          <TableCell>{dlt.type}</TableCell>
-                          <TableCell>{dlt.tables}</TableCell>
-                          <TableCell>{dlt.lastUpdate}</TableCell>
+                          <TableCell>{cluster.type}</TableCell>
+                          <TableCell>{cluster.runtime}</TableCell>
+                          <TableCell>{cluster.workers}</TableCell>
                           <TableCell>
-                            <StatusBadge status={dlt.status} />
+                            <StatusBadge status={cluster.status} />
                           </TableCell>
                         </TableRow>
                       ))
@@ -1006,18 +1072,21 @@ export  function DatabricksMigrationWorkspace({ onLogout, onBack, onMigrationCom
             </TabsContent>
           </Tabs>
 
-          {/* Pagination */}
           <div className="flex items-center justify-between mt-4 text-sm text-muted-foreground">
             <span>Rows per page: 10</span>
-            <span>1-{mockJobs.length + mockNotebooks.length + mockWorkflows.length + mockDLTs.length} of {mockJobs.length + mockNotebooks.length + mockWorkflows.length + mockDLTs.length}</span>
+            <span>1-{totalAssets} of {totalAssets}</span>
           </div>
         </main>
 
-        {/* Footer */}
         <footer className="text-center py-4 text-sm text-muted-foreground border-t">
           © 2024 Migration Tool v3.1.0
         </footer>
       </div>
+      <ConnectFabricModal
+        open={showFabricModal}
+        onClose={() => setShowFabricModal(false)}
+        onConnect={handleFabricConnect}
+      />
     </div>
   );
 }

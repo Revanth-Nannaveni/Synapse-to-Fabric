@@ -38,6 +38,8 @@ import {
   ChevronRight,
   Loader2,
 } from "lucide-react";
+import { useFabricCredentials } from "@/contexts/FabricCredentialsContext";
+import { ConnectFabricModal } from "@/components/modals/ConnectFabricModal";
 
 interface SparkPool {
   id: string;
@@ -86,7 +88,7 @@ interface MigrationWorkspaceProps {
 // Helper function to format error messages from API responses
 function formatErrorMessage(error: any): string | undefined {
   if (!error) return undefined;
-  
+
   // If error is a string, return it as-is
   if (typeof error === 'string') {
     // Try to parse if it looks like JSON
@@ -99,28 +101,30 @@ function formatErrorMessage(error: any): string | undefined {
       return error;
     }
   }
-  
+
   // If error is an object with a message property, extract it
   if (typeof error === 'object' && error.message) {
     return error.message;
   }
-  
+
   // Fallback: stringify the error
   return JSON.stringify(error);
 }
 
-export function MigrationWorkspace({ 
-  onLogout, 
-  onBack, 
+export function MigrationWorkspace({
+  onLogout,
+  onBack,
   onMigrationComplete,
   onMigrationUpdate,
-  apiResponse 
+  apiResponse
 }: MigrationWorkspaceProps) {
   const { credentials } = useAzureCredentials();
-  
+  const { credentials: fabricCredentials, setCredentials: setFabricCredentials } = useFabricCredentials();
+
+
   // Transform API data
   const transformedData = transformApiResponse(apiResponse);
-  
+
   const [activeTab, setActiveTab] = useState<TabType>("sparkPools");
   const [selectedItems, setSelectedItems] = useState<Record<TabType, string[]>>({
     sparkPools: [],
@@ -143,13 +147,14 @@ export function MigrationWorkspace({
     ready: calculateReadyCount(transformedData),
     conflicts: 0,
   };
+  const [showFabricModal, setShowFabricModal] = useState(false);
 
   // Filter functions
   const filterBySearch = <T extends Record<string, any>>(items: T[]) => {
     if (!searchQuery) return items;
     const query = searchQuery.toLowerCase();
-    return items.filter(item => 
-      Object.values(item).some(value => 
+    return items.filter(item =>
+      Object.values(item).some(value =>
         value != null && String(value).toLowerCase().includes(query)
       )
     );
@@ -162,7 +167,7 @@ export function MigrationWorkspace({
 
   const filterByType = (items: any[], tab: TabType) => {
     if (typeFilter === "all") return items;
-    
+
     switch (tab) {
       case "sparkPools":
         return items.filter(item => item.nodeType === typeFilter);
@@ -286,255 +291,267 @@ export function MigrationWorkspace({
     }
   };
 
- const handleStartMigration = async (workspace: any) => {
-  setIsMigrating(true);
-  setMigrationError(null);
-  
-  try {
-    console.log("Starting migration with workspace:", workspace);
-    console.log("Using credentials:", credentials);
-    
-    const selectedDetails = getSelectedItemDetails();
-    
-    // Step 1: Create initial migration items with "Running" status
-    const initialMigrationItems = selectedDetails.map(item => ({
-      id: item.id,
-      name: item.name,
-      type: item.type,
-      status: "Running" as const,
-      targetWorkspace: workspace.name,
-      lastModified: new Date().toISOString(),
-      // Include other properties from the original item
-      runtimeVersion: item.runtimeVersion,
-      nodeType: item.nodeType,
-      nodes: item.nodes,
-      language: item.language,
-      dependencies: item.dependencies,
-      activities: item.activities
-    }));
-    
-    // Step 2: Immediately navigate to report with "Running" status
-    console.log("Navigating to report with running items:", initialMigrationItems);
-    onMigrationComplete(initialMigrationItems);
-    
-    // Step 3: Prepare base payload
-    const basePayload = {
-      synapse: {
-        tenantId: credentials?.tenantId || "",
-        clientId: credentials?.clientId || "",
-        clientSecret: credentials?.clientSecret || "",
-        workspaceName: apiResponse.workspace || ""
-      },
-      fabric: {
-        tenantId: credentials?.tenantId || "",
-        clientId: credentials?.clientId || "",
-        clientSecret: credentials?.clientSecret || "",
-        workspaceId: workspace.id || ""
+  const handleFabricConnect = (apiResponse: any) => {
+    setShowFabricModal(false);
+    setShowReview(true); // Go to review screen after connecting
+  };
+
+  const handleStartMigration = async (workspace: any) => {
+    setIsMigrating(true);
+    setMigrationError(null);
+
+    try {
+
+      if (!fabricCredentials?.tenantId || !fabricCredentials?.clientId || !fabricCredentials?.clientSecret) {
+        setMigrationError("Fabric credentials not found. Please connect to Fabric.");
+        setIsMigrating(false);
+        return;
       }
-    };
-    
-    console.log("Base payload:", basePayload);
-    
-    // Step 4: Migrate Spark Pools (one at a time)
-    const selectedPools = selectedDetails.filter(item => item.type === "SparkPool");
-    for (const pool of selectedPools) {
-      console.log("Migrating Spark Pool:", pool.name);
-      
-      const sparkPoolPayload = {
-        ...basePayload,
-        selectedPools: [pool.name],
-        migrateConfigs: true
+
+      console.log("Starting migration with workspace:", workspace);
+      console.log("Using credentials:", credentials);
+
+      const selectedDetails = getSelectedItemDetails();
+
+      // Step 1: Create initial migration items with "Running" status
+      const initialMigrationItems = selectedDetails.map(item => ({
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        status: "Running" as const,
+        targetWorkspace: workspace.name,
+        lastModified: new Date().toISOString(),
+        // Include other properties from the original item
+        runtimeVersion: item.runtimeVersion,
+        nodeType: item.nodeType,
+        nodes: item.nodes,
+        language: item.language,
+        dependencies: item.dependencies,
+        activities: item.activities
+      }));
+
+      // Step 2: Immediately navigate to report with "Running" status
+      console.log("Navigating to report with running items:", initialMigrationItems);
+      onMigrationComplete(initialMigrationItems);
+
+      // Step 3: Prepare base payload
+      const basePayload = {
+        synapse: {
+          tenantId: credentials?.tenantId || "",
+          clientId: credentials?.clientId || "",
+          clientSecret: credentials?.clientSecret || "",
+          workspaceName: apiResponse.workspace || ""
+        },
+        fabric: {
+          tenantId: fabricCredentials.tenantId,
+          clientId: fabricCredentials.clientId,
+          clientSecret: fabricCredentials.clientSecret,
+          workspaceId: workspace.id || ""
+        }
       };
-      
-      console.log("Spark Pool Migration Payload:", JSON.stringify(sparkPoolPayload, null, 2));
-      
-      try {
-        const sparkResponse = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/SparkPoolMigration?code=${import.meta.env.VITE_API_CODE_SPARK_POOL_MIGRATION}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(sparkPoolPayload)
-          }
-        );
-        
-        const sparkResult = await sparkResponse.json();
-        console.log("Spark Pool Migration Response:", sparkResult);
-        
-        const isSuccess = sparkResult.Success?.includes(pool.name);
-        const failedItem = sparkResult.Failed?.find((f: any) => f.name === pool.name);
-        
-        // Update this specific item in the report
-        onMigrationUpdate((prevItems) => 
-          prevItems.map(item => 
-            item.id === pool.id 
-              ? {
+
+      console.log("Base payload:", basePayload);
+
+      // Step 4: Migrate Spark Pools (one at a time)
+      const selectedPools = selectedDetails.filter(item => item.type === "SparkPool");
+      for (const pool of selectedPools) {
+        console.log("Migrating Spark Pool:", pool.name);
+
+        const sparkPoolPayload = {
+          ...basePayload,
+          selectedPools: [pool.name],
+          migrateConfigs: true
+        };
+
+        console.log("Spark Pool Migration Payload:", JSON.stringify(sparkPoolPayload, null, 2));
+
+        try {
+          const sparkResponse = await fetch(
+            `https://synapsetofabricfunc-fmg2d2ejctg2eacu.eastus-01.azurewebsites.net/api/SparkPoolMigration?code=HfwGAGfirHgSTgWoZKTY_pUKlOnDUQe1moz5E9WyQm25AzFutfxqPA==`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(sparkPoolPayload)
+            }
+          );
+
+          const sparkResult = await sparkResponse.json();
+          console.log("Spark Pool Migration Response:", sparkResult);
+
+          const isSuccess = sparkResult.Success?.includes(pool.name);
+          const failedItem = sparkResult.Failed?.find((f: any) => f.name === pool.name);
+
+          // Update this specific item in the report
+          onMigrationUpdate((prevItems) =>
+            prevItems.map(item =>
+              item.id === pool.id
+                ? {
                   ...item,
                   status: isSuccess ? "Success" : "Failed",
                   errorMessage: formatErrorMessage(failedItem?.message),
                   lastModified: new Date().toISOString()
                 }
-              : item
-          )
-        );
-      } catch (error) {
-        console.error("Spark Pool Migration Error:", error);
-        onMigrationUpdate((prevItems) => 
-          prevItems.map(item => 
-            item.id === pool.id 
-              ? {
+                : item
+            )
+          );
+        } catch (error) {
+          console.error("Spark Pool Migration Error:", error);
+          onMigrationUpdate((prevItems) =>
+            prevItems.map(item =>
+              item.id === pool.id
+                ? {
                   ...item,
                   status: "Failed",
                   errorMessage: formatErrorMessage(error instanceof Error ? error.message : error),
                   lastModified: new Date().toISOString()
                 }
-              : item
-          )
-        );
+                : item
+            )
+          );
+        }
       }
-    }
-    
-    // Step 5: Migrate Notebooks (one at a time)
-    const selectedNotebooks = selectedDetails.filter(item => item.type === "Notebook");
-    for (const notebook of selectedNotebooks) {
-      console.log("Migrating Notebook:", notebook.name);
-      
-      const notebookPayload = {
-        ...basePayload,
-        notebooks: [notebook.name]
-      };
-      
-      console.log("Notebook Migration Payload:", JSON.stringify(notebookPayload, null, 2));
-      
-      try {
-        const notebookResponse = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/NotebooksMigration?code=${import.meta.env.VITE_API_CODE_NOTEBOOKS_MIGRATION}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(notebookPayload)
-          }
-        );
-        
-        const notebookResult = await notebookResponse.json();
-        console.log("Notebook Migration Response:", notebookResult);
-        
-        const isSuccess = notebookResult.Success?.includes(notebook.name);
-        const failedItem = notebookResult.Failed?.find((f: any) => f.name === notebook.name);
-        
-        onMigrationUpdate((prevItems) => 
-          prevItems.map(item => 
-            item.id === notebook.id 
-              ? {
+
+      // Step 5: Migrate Notebooks (one at a time)
+      const selectedNotebooks = selectedDetails.filter(item => item.type === "Notebook");
+      for (const notebook of selectedNotebooks) {
+        console.log("Migrating Notebook:", notebook.name);
+
+        const notebookPayload = {
+          ...basePayload,
+          notebooks: [notebook.name]
+        };
+
+        console.log("Notebook Migration Payload:", JSON.stringify(notebookPayload, null, 2));
+
+        try {
+          const notebookResponse = await fetch(
+            `https://synapsetofabricfunc-fmg2d2ejctg2eacu.eastus-01.azurewebsites.net/api/NotebooksMigration?code=_L6yqszQwmXCOK3O1JV6mYvDYJ_Pc8SKhattlpxeG1e5AzFuF7IXoQ==`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(notebookPayload)
+            }
+          );
+
+          const notebookResult = await notebookResponse.json();
+          console.log("Notebook Migration Response:", notebookResult);
+
+          const isSuccess = notebookResult.Success?.includes(notebook.name);
+          const failedItem = notebookResult.Failed?.find((f: any) => f.name === notebook.name);
+
+          onMigrationUpdate((prevItems) =>
+            prevItems.map(item =>
+              item.id === notebook.id
+                ? {
                   ...item,
                   status: isSuccess ? "Success" : "Failed",
                   errorMessage: formatErrorMessage(failedItem?.message),
                   lastModified: new Date().toISOString()
                 }
-              : item
-          )
-        );
-      } catch (error) {
-        console.error("Notebook Migration Error:", error);
-        onMigrationUpdate((prevItems) => 
-          prevItems.map(item => 
-            item.id === notebook.id 
-              ? {
+                : item
+            )
+          );
+        } catch (error) {
+          console.error("Notebook Migration Error:", error);
+          onMigrationUpdate((prevItems) =>
+            prevItems.map(item =>
+              item.id === notebook.id
+                ? {
                   ...item,
                   status: "Failed",
                   errorMessage: formatErrorMessage(error instanceof Error ? error.message : error),
                   lastModified: new Date().toISOString()
                 }
-              : item
-          )
-        );
+                : item
+            )
+          );
+        }
       }
-    }
-    
-    // Step 6: Migrate Pipelines (one at a time)
-    const selectedPipelines = selectedDetails.filter(item => item.type === "Pipeline");
-    for (const pipeline of selectedPipelines) {
-      console.log("Migrating Pipeline:", pipeline.name);
-      
-      const pipelinePayload = {
-        ...basePayload,
-        pipelines: [pipeline.name]
-      };
-      
-      console.log("Pipeline Migration Payload:", JSON.stringify(pipelinePayload, null, 2));
-      
-      try {
-        const pipelineResponse = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/PipelinesMigration?code=${import.meta.env.VITE_API_CODE_PIPELINES_MIGRATION}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(pipelinePayload)
-          }
-        );
-        
-        const pipelineResult = await pipelineResponse.json();
-        console.log("Pipeline Migration Response:", pipelineResult);
-        
-        const isSuccess = pipelineResult.Success?.includes(pipeline.name);
-        const failedItem = pipelineResult.Failed?.find((f: any) => f.name === pipeline.name);
-        
-        onMigrationUpdate((prevItems) => 
-          prevItems.map(item => 
-            item.id === pipeline.id 
-              ? {
+
+      // Step 6: Migrate Pipelines (one at a time)
+      const selectedPipelines = selectedDetails.filter(item => item.type === "Pipeline");
+      for (const pipeline of selectedPipelines) {
+        console.log("Migrating Pipeline:", pipeline.name);
+
+        const pipelinePayload = {
+          ...basePayload,
+          pipelines: [pipeline.name]
+        };
+
+        console.log("Pipeline Migration Payload:", JSON.stringify(pipelinePayload, null, 2));
+
+        try {
+          const pipelineResponse = await fetch(
+            `https://synapsetofabricfunc-fmg2d2ejctg2eacu.eastus-01.azurewebsites.net/api/PipelinesMigration?code=3KEsNu4LwfkgincTCz9-j5YZdj14EQkItywZpK4DfgLmAzFuxqtOYg==`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(pipelinePayload)
+            }
+          );
+
+          const pipelineResult = await pipelineResponse.json();
+          console.log("Pipeline Migration Response:", pipelineResult);
+
+          const isSuccess = pipelineResult.Success?.includes(pipeline.name);
+          const failedItem = pipelineResult.Failed?.find((f: any) => f.name === pipeline.name);
+
+          onMigrationUpdate((prevItems) =>
+            prevItems.map(item =>
+              item.id === pipeline.id
+                ? {
                   ...item,
                   status: isSuccess ? "Success" : "Failed",
                   errorMessage: formatErrorMessage(failedItem?.message),
                   lastModified: new Date().toISOString()
                 }
-              : item
-          )
-        );
-      } catch (error) {
-        console.error("Pipeline Migration Error:", error);
-        onMigrationUpdate((prevItems) => 
-          prevItems.map(item => 
-            item.id === pipeline.id 
-              ? {
+                : item
+            )
+          );
+        } catch (error) {
+          console.error("Pipeline Migration Error:", error);
+          onMigrationUpdate((prevItems) =>
+            prevItems.map(item =>
+              item.id === pipeline.id
+                ? {
                   ...item,
                   status: "Failed",
                   errorMessage: formatErrorMessage(error instanceof Error ? error.message : error),
                   lastModified: new Date().toISOString()
                 }
-              : item
-          )
-        );
+                : item
+            )
+          );
+        }
       }
-    }
-    
-    // Step 7: Handle Linked Services (not implemented)
-    const selectedLinkedServices = selectedDetails.filter(item => item.type === "LinkedService");
-    for (const service of selectedLinkedServices) {
-      console.log("Linked Services migration not yet implemented");
-      onMigrationUpdate((prevItems) => 
-        prevItems.map(item => 
-          item.id === service.id 
-            ? {
+
+      // Step 7: Handle Linked Services (not implemented)
+      const selectedLinkedServices = selectedDetails.filter(item => item.type === "LinkedService");
+      for (const service of selectedLinkedServices) {
+        console.log("Linked Services migration not yet implemented");
+        onMigrationUpdate((prevItems) =>
+          prevItems.map(item =>
+            item.id === service.id
+              ? {
                 ...item,
                 status: "Failed",
                 errorMessage: "Linked Services migration not yet implemented",
                 lastModified: new Date().toISOString()
               }
-            : item
-        )
-      );
+              : item
+          )
+        );
+      }
+
+      console.log("=== ALL MIGRATIONS COMPLETED ===");
+      setIsMigrating(false);
+
+    } catch (error) {
+      console.error("Migration error:", error);
+      setMigrationError(error instanceof Error ? error.message : "Unknown error occurred");
+      setIsMigrating(false);
     }
-    
-    console.log("=== ALL MIGRATIONS COMPLETED ===");
-    setIsMigrating(false);
-    
-  } catch (error) {
-    console.error("Migration error:", error);
-    setMigrationError(error instanceof Error ? error.message : "Unknown error occurred");
-    setIsMigrating(false);
-  }
-};
+  };
 
   if (showReview) {
     const selectedDetails = getSelectedItemDetails();
@@ -704,7 +721,7 @@ export function MigrationWorkspace({
                   )}
                 </Button>
               </div>
-              
+
               {migrationError && (
                 <div className="mt-4 p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
                   <strong>Error:</strong> {migrationError}
@@ -725,9 +742,9 @@ export function MigrationWorkspace({
 
   return (
     <div className="min-h-screen bg-background flex">
-      <MigrationSidebar 
-        activeTab={activeTab} 
-        onTabChange={(tab) => setActiveTab(tab as TabType)} 
+      <MigrationSidebar
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab as TabType)}
         onBack={onBack}
         workspaceName={apiResponse.workspace || "Synapse Workspace"}
       />
@@ -761,7 +778,13 @@ export function MigrationWorkspace({
               <Button
                 variant="azure"
                 disabled={totalSelected === 0}
-                onClick={() => setShowReview(true)}
+                onClick={() => {
+                  if (!fabricCredentials) {
+                    setShowFabricModal(true);
+                  } else {
+                    setShowReview(true);
+                  }
+                }}
               >
                 Migrate Selected
               </Button>
@@ -849,7 +872,7 @@ export function MigrationWorkspace({
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              
+
               <div className="relative">
                 <select
                   value={statusFilter}
@@ -1146,6 +1169,11 @@ export function MigrationWorkspace({
           © 2023 Migration Tool v3.1.0
         </footer>
       </div>
+      <ConnectFabricModal
+        open={showFabricModal}
+        onClose={() => setShowFabricModal(false)}
+        onConnect={handleFabricConnect}
+      />
     </div>
   );
 }

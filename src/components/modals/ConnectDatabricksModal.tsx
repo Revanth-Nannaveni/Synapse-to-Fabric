@@ -10,8 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Wifi } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useDatabricksCredentials } from "@/contexts/DatabricksCredentialsContext";
 
 interface DatabricksDiscoveryScope {
   jobs: boolean;
@@ -26,10 +27,23 @@ interface DatabricksMigrationConfig {
   discoveryScope: DatabricksDiscoveryScope;
 }
 
+interface DatabricksApiResponse {
+  counts: {
+    notebooks: number;
+    folders: number;
+    jobs: number;
+    clusters: number;
+  };
+  notebooks: any[];
+  folders: any[];
+  jobs: any[];
+  clusters: any[];
+}
+
 interface ConnectDatabricksModalProps {
   open: boolean;
   onClose: () => void;
-  onStartMigration: (config: DatabricksMigrationConfig) => void;
+  onStartMigration: (config: DatabricksMigrationConfig, apiResponse: DatabricksApiResponse) => void;
 }
 
 export function ConnectDatabricksModal({
@@ -38,9 +52,10 @@ export function ConnectDatabricksModal({
   onStartMigration,
 }: ConnectDatabricksModalProps) {
   const { toast } = useToast();
+  const { setCredentials } = useDatabricksCredentials();
 
   const [loading, setLoading] = useState(false);
-  const [testLoading, setTestLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<DatabricksMigrationConfig>({
     workspaceUrl: "",
@@ -63,41 +78,153 @@ export function ConnectDatabricksModal({
     }));
   };
 
-  const handleTestConnection = async () => {
-    setTestLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    setTestLoading(false);
-
-    toast({
-      title: "Connection Successful",
-      description: "Databricks workspace validated successfully.",
-    });
-  };
-
   const handleConnect = async () => {
+    console.log("=== Databricks Connection Start ===");
+
+    // Validation
     if (!formData.workspaceUrl || !formData.accessToken) {
+      const message = "Workspace URL and Access Token are required.";
+      setError(message);
       toast({
         title: "Missing Required Fields",
-        description: "Workspace URL and Access Token are required.",
+        description: message,
         variant: "destructive",
       });
       return;
     }
 
+    // Clean and validate URL
+    let cleanUrl = formData.workspaceUrl.trim();
+    if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+      cleanUrl = "https://" + cleanUrl;
+    }
+
+    console.log("Connecting to:", cleanUrl);
+
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1500));
-    setLoading(false);
+    setError(null);
 
-    toast({
-      title: "Databricks Connected",
-      description: "Discovery process started successfully.",
-    });
+    const payload = {
+      databricksUrl: cleanUrl,
+      personalAccessToken: formData.accessToken.trim(),
+    };
 
-    onStartMigration(formData);
+    try {
+      console.log("Making discovery API call...");
+      const response = await fetch(
+        "https://databrickstofabric-fuhdb8a7dhbebrf5.eastus-01.azurewebsites.net/api/ConnecttoDatabricks?code=-gZ_9a0Icf_IXxVHA6edZYnTAUPPVmrDW801cHXAG1M0AzFuvArpZQ==",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      console.log("Response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API Error Response:", errorText);
+
+        let errorMessage = `Connection failed (${response.status})`;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch {
+          // If not JSON, use the text as is
+          if (errorText) errorMessage = errorText;
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const apiResponse: DatabricksApiResponse = await response.json();
+      console.log("API Response:", {
+        counts: apiResponse.counts,
+        notebooksCount: apiResponse.notebooks?.length || 0,
+        jobsCount: apiResponse.jobs?.length || 0,
+        clustersCount: apiResponse.clusters?.length || 0,
+      });
+
+      // Validate response structure
+      if (!apiResponse || !apiResponse.counts) {
+        console.error("Invalid API response structure:", apiResponse);
+        throw new Error("Invalid response from Databricks API. Please check your credentials.");
+      }
+
+      // Calculate total discovered items
+      const totalItems = (apiResponse.jobs?.length || 0) +
+        (apiResponse.notebooks?.length || 0) +
+        (apiResponse.clusters?.length || 0);
+
+      console.log("Total items discovered:", totalItems);
+
+      if (totalItems === 0) {
+        const message = "No assets found in this workspace. Please check your workspace URL and access token.";
+        setError(message);
+        toast({
+          title: "No Assets Found",
+          description: message,
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // SUCCESS: Store credentials
+      console.log("Storing credentials in context...");
+      setCredentials({
+        databricksUrl: cleanUrl,
+        personalAccessToken: formData.accessToken.trim(),
+      });
+
+      // Show success message
+      toast({
+        title: "Connection Successful",
+        description: `Found ${apiResponse.counts.notebooks} notebooks, ${apiResponse.counts.jobs} jobs, ${apiResponse.counts.clusters} clusters`,
+      });
+
+      console.log("Calling onStartMigration...");
+
+      // Update form data with clean URL
+      const updatedConfig = {
+        ...formData,
+        workspaceUrl: cleanUrl,
+      };
+
+      // Pass data to parent
+      onStartMigration(updatedConfig, apiResponse);
+
+      // Close modal
+      onClose();
+
+      console.log("=== Databricks Connection Complete ===");
+
+    } catch (err) {
+      console.error("Connection error:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to connect to Databricks";
+      setError(errorMessage);
+      toast({
+        title: "Connection Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (!loading) {
+      setError(null);
+      onClose();
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-lg bg-card">
         <DialogHeader>
           <DialogTitle>Connect to Databricks</DialogTitle>
@@ -107,6 +234,22 @@ export function ConnectDatabricksModal({
         </DialogHeader>
 
         <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+          {error && (
+            <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-destructive" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-destructive">
+                  {error.includes("401") || error.includes("403")
+                    ? "Invalid credentials. Please check your Workspace URL and Access Token."
+                    : error.includes("404")
+                      ? "Workspace not found. Please verify your Workspace URL."
+                      : error.length > 120
+                        ? "Connection failed. Please check your credentials and try again."
+                        : error}
+                </p>
+              </div>
+            </div>
+          )}
           <div className="space-y-2">
             <Label>
               Workspace URL <span className="text-destructive">*</span>
@@ -114,10 +257,15 @@ export function ConnectDatabricksModal({
             <Input
               placeholder="https://adb-123456.azuredatabricks.net"
               value={formData.workspaceUrl}
-              onChange={(e) =>
-                setFormData({ ...formData, workspaceUrl: e.target.value })
-              }
+              onChange={(e) => {
+                setFormData({ ...formData, workspaceUrl: e.target.value });
+                setError(null);
+              }}
+              disabled={loading}
             />
+            <p className="text-xs text-muted-foreground">
+              Enter your Databricks workspace URL
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -128,10 +276,15 @@ export function ConnectDatabricksModal({
               type="password"
               placeholder="dapiXXXXXXXX"
               value={formData.accessToken}
-              onChange={(e) =>
-                setFormData({ ...formData, accessToken: e.target.value })
-              }
+              onChange={(e) => {
+                setFormData({ ...formData, accessToken: e.target.value });
+                setError(null);
+              }}
+              disabled={loading}
             />
+            <p className="text-xs text-muted-foreground">
+              Generate a token in User Settings → Access Tokens
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -142,10 +295,10 @@ export function ConnectDatabricksModal({
               onChange={(e) =>
                 setFormData({ ...formData, clusterId: e.target.value })
               }
+              disabled={loading}
             />
           </div>
 
-          {/* Discovery Scope */}
           <div className="space-y-3 pt-2">
             <Label>Discovery Scope</Label>
             <div className="grid grid-cols-2 gap-3">
@@ -163,6 +316,7 @@ export function ConnectDatabricksModal({
                   <Checkbox
                     checked={formData.discoveryScope[key]}
                     onCheckedChange={() => toggleScope(key)}
+                    disabled={loading}
                   />
                   <div className="space-y-0.5">
                     <p className="text-sm font-medium">{title}</p>
@@ -174,32 +328,27 @@ export function ConnectDatabricksModal({
           </div>
         </div>
 
-        {/* Footer */}
         <div className="flex justify-end gap-3 pt-2 border-t">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={handleClose} disabled={loading}>
             Cancel
-          </Button>
-
-          <Button
-            variant="outline"
-            onClick={handleTestConnection}
-            disabled={testLoading}
-          >
-            {testLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Wifi className="w-4 h-4" />
-            )}
-            Test Connection
           </Button>
 
           <Button
             variant="azure"
             onClick={handleConnect}
-            disabled={loading}
+            disabled={loading || !formData.workspaceUrl || !formData.accessToken}
           >
-            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            Connect
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Connecting...
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="w-4 h-4" />
+                Connect
+              </>
+            )}
           </Button>
         </div>
       </DialogContent>

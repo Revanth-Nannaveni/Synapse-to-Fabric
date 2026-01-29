@@ -67,8 +67,8 @@ export interface SynapseConnection {
   tenantId: string;
   clientId: string;
   clientSecret: string;
-  subscriptionId?: string; // optional
-  resourceGroup?: string;  // optional
+  subscriptionId?: string;
+  resourceGroup?: string;
   workspaceName: string;
   discoveryScope: {
     sparkPools: boolean;
@@ -77,7 +77,6 @@ export interface SynapseConnection {
     linkedServices: boolean;
   };
 }
-
 
 export interface FabricConnection {
   tenantId: string;
@@ -89,19 +88,28 @@ export interface FabricConnection {
 export interface MigrationItem {
   id: string;
   name: string;
-  type: 'Workflow' | 'Job' | 'SparkPool' | 'Notebook' | 'Pipeline' | 'LinkedService';
+  type: 'Workflow' | 'Job' | 'SparkPool' | 'Notebook' | 'Pipeline' | 'LinkedService' | 'Cluster' | 'DLT';
   targetWorkspace?: string;
   status: Status;
   lastModified: string;
   errorMessage?: string;
+  source?: 'synapse' | 'databricks';
 
-  //optional
+  // Optional fields
   runtimeVersion?: string;
   nodeType?: string;
   nodes?: number;
   language?: string;
   dependencies?: number;
   activities?: number;
+  schedule?: string;
+  cluster?: string;
+  path?: string;
+  runtime?: string;
+  workers?: string;
+  tasks?: number;
+  tables?: number;
+  lastRun?: string;
 }
 
 export interface Workspace {
@@ -109,6 +117,31 @@ export interface Workspace {
   name: string;
   capacity: string;
   region: string;
+}
+
+// Databricks Types
+export interface DatabricksMigrationConfig {
+  workspaceUrl: string;
+  accessToken: string;
+  clusterId?: string;
+  discoveryScope: {
+    jobs: boolean;
+    notebooks: boolean;
+    clusters: boolean;
+  };
+}
+
+export interface DatabricksApiResponse {
+  counts: {
+    notebooks: number;
+    folders: number;
+    jobs: number;
+    clusters: number;
+  };
+  notebooks: any[];
+  folders: any[];
+  jobs: any[];
+  clusters: any[];
 }
 
 // API Response Types for Fabric Connection

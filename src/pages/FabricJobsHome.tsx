@@ -53,6 +53,7 @@ import { Input } from "@/components/ui/input";
 import type { FabricJob, FabricApiResponse, Workspace } from "@/types/migration";
 import DetailModal from "../components/modals/DetailModal";
 import type { FabricWorkspace } from "@/types/migration";
+import { useFabricCredentials } from "@/contexts/FabricCredentialsContext";
 
 interface FabricJobsHomeProps {
   onLogout: () => void;
@@ -69,6 +70,7 @@ export function FabricJobsHome({
 }: FabricJobsHomeProps) {
   const [showFabricModal, setShowFabricModal] = useState(false);
   const [isFabricConnected, setIsFabricConnected] = useState(false);
+  const { credentials: fabricCredentials, apiResponse: fabricApiResponse } = useFabricCredentials();
   const [jobs, setJobs] = useState<FabricJob[]>([]);
   const [workspaces, setWorkspaces] = useState<FabricWorkspace[]>([]);
   const [apiResponse, setApiResponse] = useState<FabricApiResponse | null>(null); // Store original API response
@@ -275,6 +277,17 @@ export function FabricJobsHome({
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, statusFilter, typeFilter, selectedWorkspace]);
+
+useEffect(() => {
+  // Auto-load Fabric data if we already have it from migration workflow
+  if (fabricApiResponse && fabricCredentials && !isFabricConnected) {
+    setIsFabricConnected(true);
+    setApiResponse(fabricApiResponse);
+    setWorkspaces(fabricApiResponse.workspaces);
+    const transformedJobs = transformApiResponseToJobs(fabricApiResponse);
+    setJobs(transformedJobs);
+  }
+}, [fabricApiResponse, fabricCredentials, isFabricConnected]);
 
   const clearFilters = () => {
     setSearchQuery("");
@@ -617,10 +630,10 @@ export function FabricJobsHome({
       </main>
 
       <ConnectFabricModal
-        open={showFabricModal}
-        onClose={() => setShowFabricModal(false)}
-        onConnect={handleConnectFabric}
-      />
+  open={showFabricModal}
+  onClose={() => setShowFabricModal(false)}
+  onConnect={handleConnectFabric}
+/>
 
       {selectedItem && (
         <DetailModal 
