@@ -86,6 +86,7 @@ export function DatabricksMigrationWorkspace({
     name: job.settings?.name || `Job ${index + 1}`,
     schedule: job.settings?.schedule?.quartz_cron_expression ||
       job.settings?.trigger?.pause_status || "Manual",
+    createdBy : job.creator_user_name || "N/A",
     lastRun: job.last_run?.start_time ?
       new Date(job.last_run.start_time).toLocaleString() : "N/A",
     cluster: job.settings?.tasks?.[0]?.existing_cluster_id ||
@@ -109,7 +110,7 @@ export function DatabricksMigrationWorkspace({
   const transformedClusters = (apiResponse?.clusters || []).map((cluster: any, index: number) => ({
     id: cluster.cluster_id || index.toString(),
     name: cluster.cluster_name || `Cluster ${index + 1}`,
-    type: cluster.cluster_source || "Interactive",
+    createdBy: cluster.creator_user_name || "N/A",
     state: cluster.state || "Unknown",
     runtime: cluster.spark_version || "N/A",
     workers: cluster.num_workers !== undefined ? cluster.num_workers.toString() : "N/A",
@@ -787,8 +788,8 @@ export function DatabricksMigrationWorkspace({
       <div className="flex-1">
         <main className="p-6 animate-fade-in">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-            <span>Home</span>
-            <ChevronRight className="w-4 h-4" />
+            {/* <span>Home</span>
+            <ChevronRight className="w-4 h-4" /> */}
             <span>Databricks Workspace</span>
             <ChevronRight className="w-4 h-4" />
             <span className="text-foreground font-medium">Discovery Results</span>
@@ -911,9 +912,10 @@ export function DatabricksMigrationWorkspace({
                         />
                       </TableHead>
                       <TableHead>JOB NAME</TableHead>
+                      <TableHead>CREATED BY</TableHead>
                       <TableHead>SCHEDULE</TableHead>
-                      <TableHead>CLUSTER</TableHead>
-                      <TableHead>LAST RUN</TableHead>
+                      {/* <TableHead>CLUSTER</TableHead> */}
+                      {/* <TableHead>LAST RUN</TableHead> */}
                       <TableHead>STATUS</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -941,9 +943,10 @@ export function DatabricksMigrationWorkspace({
                               <span className="font-medium text-primary">{job.name}</span>
                             </div>
                           </TableCell>
+                          <TableCell>{job.createdBy}</TableCell>
                           <TableCell>{job.schedule}</TableCell>
-                          <TableCell>{job.cluster}</TableCell>
-                          <TableCell>{job.lastRun}</TableCell>
+                          {/* <TableCell>{job.cluster}</TableCell>
+                          <TableCell>{job.lastRun}</TableCell> */}
                           <TableCell>
                             <StatusBadge status={job.status} />
                           </TableCell>
@@ -969,7 +972,7 @@ export function DatabricksMigrationWorkspace({
                       <TableHead className="min-w-[200px]">NOTEBOOK NAME</TableHead>
                       <TableHead className="w-[120px]">LANGUAGE</TableHead>
                       <TableHead className="min-w-[250px] max-w-[350px]">PATH</TableHead>
-                      <TableHead className="w-[150px]">LAST MODIFIED</TableHead>
+                      {/* <TableHead className="w-[150px]">LAST MODIFIED</TableHead> */}
                       <TableHead className="w-[100px]">STATUS</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1003,7 +1006,7 @@ export function DatabricksMigrationWorkspace({
                               {notebook.path}
                             </div>
                           </TableCell>
-                          <TableCell>{notebook.lastModified}</TableCell>
+                          {/* <TableCell>{notebook.lastModified}</TableCell> */}
                           <TableCell>
                             <StatusBadge status={notebook.status} />
                           </TableCell>
@@ -1027,7 +1030,7 @@ export function DatabricksMigrationWorkspace({
                         />
                       </TableHead>
                       <TableHead>CLUSTER NAME</TableHead>
-                      <TableHead>TYPE</TableHead>
+                      <TableHead>CREATED BY</TableHead>
                       <TableHead>RUNTIME</TableHead>
                       <TableHead>WORKERS</TableHead>
                       <TableHead>STATUS</TableHead>
@@ -1057,7 +1060,7 @@ export function DatabricksMigrationWorkspace({
                               <span className="font-medium text-primary">{cluster.name}</span>
                             </div>
                           </TableCell>
-                          <TableCell>{cluster.type}</TableCell>
+                          <TableCell>{cluster.createdBy}</TableCell>
                           <TableCell>{cluster.runtime}</TableCell>
                           <TableCell>{cluster.workers}</TableCell>
                           <TableCell>

@@ -64,7 +64,7 @@ export function ConnectDatabricksModal({
     discoveryScope: {
       jobs: true,
       notebooks: true,
-      clusters: false,
+      clusters: true,
     },
   });
 
@@ -287,7 +287,7 @@ export function ConnectDatabricksModal({
             </p>
           </div>
 
-          <div className="space-y-2">
+          {/* <div className="space-y-2">
             <Label>Cluster ID (optional)</Label>
             <Input
               placeholder="0715-134320-abcde"
@@ -297,7 +297,7 @@ export function ConnectDatabricksModal({
               }
               disabled={loading}
             />
-          </div>
+          </div> */}
 
           <div className="space-y-3 pt-2">
             <Label>Discovery Scope</Label>

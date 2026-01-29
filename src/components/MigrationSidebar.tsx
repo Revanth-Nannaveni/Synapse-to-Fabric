@@ -34,7 +34,7 @@ const inventoryItems = [
   { id: "sparkPools", label: "Spark Pools", icon: Database },
   { id: "notebooks", label: "Notebooks", icon: BookOpen },
   { id: "pipelines", label: "Pipelines", icon: GitBranch },
-  { id: "linkedServices", label: "Linked Services", icon: Link2 },
+  // { id: "linkedServices", label: "Linked Services", icon: Link2 },
 ];
 
 export function MigrationSidebar({ activeTab, onTabChange, onBack, workspaceName }: MigrationSidebarProps) {

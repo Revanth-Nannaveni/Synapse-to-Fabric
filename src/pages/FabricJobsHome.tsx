@@ -530,8 +530,8 @@ useEffect(() => {
                       <TableRow>
                         <TableHead className="text-xs py-2 w-[240px]">JOB NAME</TableHead>
                         <TableHead className="text-xs py-2 w-[120px]">TYPE</TableHead>
-                        <TableHead className="text-xs py-2 w-[110px]">CREATED AT</TableHead>
-                        <TableHead className="text-xs py-2 w-[110px]">LAST RUN</TableHead>
+                        {/* <TableHead className="text-xs py-2 w-[110px]">CREATED AT</TableHead>
+                        <TableHead className="text-xs py-2 w-[110px]">LAST RUN</TableHead> */}
                         <TableHead className="text-xs py-2 w-[100px]">STATUS</TableHead>
                         <TableHead className="text-xs py-2 text-right w-[80px]">ACTIONS</TableHead>
                       </TableRow>
@@ -560,8 +560,8 @@ useEffect(() => {
                             {job.type}
                           </TableCell>
 
-                          <TableCell className="text-xs">Oct 24, 2023</TableCell>
-                          <TableCell className="text-xs">{job.lastModified}</TableCell>
+                          {/* <TableCell className="text-xs">Oct 24, 2023</TableCell> */}
+                          {/* <TableCell className="text-xs">{job.lastModified}</TableCell> */}
                           <TableCell>
                             <StatusBadge status={job.status} />
                           </TableCell>

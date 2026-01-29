@@ -668,7 +668,7 @@ export function MigrationWorkspace({
                 </div>
               )}
 
-              {selectedItems.linkedServices.length > 0 && (
+              {/* {selectedItems.linkedServices.length > 0 && (
                 <div>
                   <h4 className="font-medium mb-3 flex items-center gap-2">
                     <Link2 className="w-4 h-4 text-primary" />
@@ -697,7 +697,7 @@ export function MigrationWorkspace({
                       ))}
                   </div>
                 </div>
-              )}
+              )} */}
 
               <div className="flex justify-between pt-4 border-t">
                 <Button variant="outline" onClick={() => setShowReview(false)}>
@@ -752,10 +752,10 @@ export function MigrationWorkspace({
         <main className="p-6 animate-fade-in">
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-            <span>Home</span>
-            <ChevronRight className="w-4 h-4" />
-            <span>Projects</span>
-            <ChevronRight className="w-4 h-4" />
+            {/* <span>Home</span> */}
+            {/* <ChevronRight className="w-4 h-4" />
+            <span>Projects</span> */}
+            {/* <ChevronRight className="w-4 h-4" /> */}
             <span>{apiResponse.workspace}</span>
             <ChevronRight className="w-4 h-4" />
             <span className="text-foreground font-medium">Discovery Results</span>
@@ -852,13 +852,13 @@ export function MigrationWorkspace({
                   {pipelines.length}
                 </span>
               </TabsTrigger>
-              <TabsTrigger value="linkedServices" className="gap-2">
+              {/* <TabsTrigger value="linkedServices" className="gap-2">
                 <Link2 className="w-4 h-4" />
                 Linked Services
                 <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary/10 text-primary rounded">
                   {linkedServices.length}
                 </span>
-              </TabsTrigger>
+              </TabsTrigger> */}
             </TabsList>
 
             {/* Search & Filters */}
@@ -940,7 +940,7 @@ export function MigrationWorkspace({
                       <TableHead>RUNTIME VER.</TableHead>
                       <TableHead>NODE TYPE</TableHead>
                       <TableHead>NODES</TableHead>
-                      <TableHead>LIBRARIES</TableHead>
+                      {/* <TableHead>LIBRARIES</TableHead> */}
                       <TableHead>STATUS</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -971,7 +971,7 @@ export function MigrationWorkspace({
                           <TableCell>{pool.runtimeVersion}</TableCell>
                           <TableCell>{pool.nodeType}</TableCell>
                           <TableCell>{pool.nodes}</TableCell>
-                          <TableCell className="text-primary">{pool.libraries}</TableCell>
+                          {/* <TableCell className="text-primary">{pool.libraries}</TableCell> */}
                           <TableCell>
                             <StatusBadge status={pool.status} />
                           </TableCell>
@@ -998,8 +998,8 @@ export function MigrationWorkspace({
                       </TableHead>
                       <TableHead>NOTEBOOK NAME</TableHead>
                       <TableHead>LANGUAGE</TableHead>
-                      <TableHead>LAST MODIFIED</TableHead>
-                      <TableHead>DEPENDENCIES</TableHead>
+                      {/* <TableHead>LAST MODIFIED</TableHead>
+                      <TableHead>DEPENDENCIES</TableHead> */}
                       <TableHead>STATUS</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1028,8 +1028,8 @@ export function MigrationWorkspace({
                             </div>
                           </TableCell>
                           <TableCell>{notebook.language}</TableCell>
-                          <TableCell>{notebook.lastModified}</TableCell>
-                          <TableCell>{notebook.dependencies}</TableCell>
+                          {/* <TableCell>{notebook.lastModified}</TableCell>
+                          <TableCell>{notebook.dependencies}</TableCell> */}
                           <TableCell>
                             <StatusBadge status={notebook.status} />
                           </TableCell>
@@ -1056,7 +1056,7 @@ export function MigrationWorkspace({
                       </TableHead>
                       <TableHead>PIPELINE NAME</TableHead>
                       <TableHead>ACTIVITIES</TableHead>
-                      <TableHead>LAST RUN</TableHead>
+                      {/* <TableHead>LAST RUN</TableHead> */}
                       <TableHead>STATUS</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1085,7 +1085,7 @@ export function MigrationWorkspace({
                             </div>
                           </TableCell>
                           <TableCell>{pipeline.activities}</TableCell>
-                          <TableCell>{pipeline.lastRun}</TableCell>
+                          {/* <TableCell>{pipeline.lastRun}</TableCell> */}
                           <TableCell>
                             <StatusBadge status={pipeline.status} />
                           </TableCell>
@@ -1097,7 +1097,7 @@ export function MigrationWorkspace({
               </Card>
             </TabsContent>
 
-            <TabsContent value="linkedServices">
+            {/* <TabsContent value="linkedServices">
               <Card>
                 <Table>
                   <TableHeader>
@@ -1149,7 +1149,7 @@ export function MigrationWorkspace({
                   </TableBody>
                 </Table>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
           </Tabs>
 
           {/* Pagination */}
